@@ -62,8 +62,8 @@ export default function TeamPage() {
         ) : members.length === 0 ? (
           <div className="text-center py-20 text-gray-500">Δεν υπάρχουν μέλη</div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
+            <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <th className="px-6 py-3">Μέλος</th>

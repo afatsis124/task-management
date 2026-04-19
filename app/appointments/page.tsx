@@ -160,8 +160,8 @@ export default function AppointmentsPage() {
 
         {/* Form Modal */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
                 {editing ? "Επεξεργασία" : "Νέο Ραντεβού"}
               </h2>
@@ -192,7 +192,7 @@ export default function AppointmentsPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Ημερομηνία *</label>
                     <input
@@ -223,7 +223,7 @@ export default function AppointmentsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Ανάθεση σε</label>
                     <select
@@ -295,30 +295,38 @@ export default function AppointmentsPage() {
 
                     return (
                       <div key={apt.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition">
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-start gap-3">
                           <div className="text-center w-14 flex-shrink-0">
-                            <p className="text-lg font-bold text-blue-600">
+                            <p className="text-base font-bold text-blue-600">
                               {d.toLocaleTimeString("el-GR", { hour: "2-digit", minute: "2-digit" })}
                             </p>
-                            <p className="text-[10px] text-gray-400">{apt.duration_minutes} λεπτά</p>
+                            <p className="text-[10px] text-gray-400">{apt.duration_minutes}λεπτά</p>
                           </div>
 
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900">{apt.title}</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 truncate">
                               {elevator ? `${elevator.address}, ${elevator.area}` : "—"}
                             </p>
+                            {/* Mobile: badges below */}
+                            <div className="flex items-center flex-wrap gap-2 mt-1 sm:hidden">
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${st.color}`}>
+                                {st.label}
+                              </span>
+                              {assignee && (
+                                <span className="text-xs text-gray-500">{assignee.full_name}</span>
+                              )}
+                            </div>
                           </div>
 
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${st.color}`}>
+                          <span className={`hidden sm:inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${st.color}`}>
                             {st.label}
                           </span>
-
                           {assignee && (
-                            <span className="text-xs text-gray-500">{assignee.full_name}</span>
+                            <span className="hidden sm:inline text-xs text-gray-500">{assignee.full_name}</span>
                           )}
 
-                          <button onClick={() => openEdit(apt)} className="text-gray-400 hover:text-blue-600">
+                          <button onClick={() => openEdit(apt)} className="text-gray-400 hover:text-blue-600 flex-shrink-0">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>

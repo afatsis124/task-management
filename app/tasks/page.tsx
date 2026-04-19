@@ -154,13 +154,13 @@ export default function TasksPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-4">
           <input
             type="text"
             placeholder="Αναζήτηση..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+            className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
           />
           <select
             value={filterPriority}
@@ -187,8 +187,8 @@ export default function TasksPage() {
 
         {/* Form Modal */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
                 {editing ? "Επεξεργασία Εργασίας" : "Νέα Εργασία"}
               </h2>
@@ -221,7 +221,7 @@ export default function TasksPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Προτεραιότητα</label>
                     <div className="flex gap-2">
@@ -259,7 +259,7 @@ export default function TasksPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Ανάθεση σε</label>
                     <select
@@ -341,25 +341,27 @@ export default function TasksPage() {
                     task.priority === "urgent" ? "border-l-4 border-l-amber-500" : ""
                   }`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-start gap-3">
                     {/* Quick complete */}
-                    {task.status !== "completed" && task.status !== "cancelled" && (
-                      <button
-                        onClick={() => updateStatus(task, "completed")}
-                        className="w-5 h-5 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 transition flex-shrink-0"
-                        title="Ολοκλήρωση"
-                      />
-                    )}
-                    {task.status === "completed" && (
-                      <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
+                    <div className="flex-shrink-0 mt-0.5">
+                      {task.status !== "completed" && task.status !== "cancelled" && (
+                        <button
+                          onClick={() => updateStatus(task, "completed")}
+                          className="w-5 h-5 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 transition"
+                          title="Ολοκλήρωση"
+                        />
+                      )}
+                      {task.status === "completed" && (
+                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className={`text-sm font-medium ${task.status === "completed" ? "text-gray-400 line-through" : "text-gray-900"}`}>
                           {task.title}
                         </p>
@@ -369,32 +371,42 @@ export default function TasksPage() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                      <div className="flex items-center flex-wrap gap-2 mt-1 text-xs text-gray-500">
                         {elevator && <span>{elevator.address}</span>}
                         {task.due_date && (
                           <span className={isOverdue ? "text-red-500" : ""}>
                             Προθεσμία: {new Date(task.due_date).toLocaleDateString("el-GR")}
                           </span>
                         )}
+                        {assignee && <span className="sm:hidden">{assignee.full_name}</span>}
+                      </div>
+                      {/* Badges below on mobile */}
+                      <div className="flex items-center gap-2 mt-1 sm:hidden">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
+                          {priority.label}
+                        </span>
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.text}`}>
+                          {status.label}
+                        </span>
                       </div>
                     </div>
 
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
+                    {/* Inline on desktop */}
+                    <span className={`hidden sm:inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
                       {priority.label}
                     </span>
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.text}`}>
+                    <span className={`hidden sm:inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.text}`}>
                       {status.label}
                     </span>
-
                     {assignee && (
-                      <span className="text-xs text-gray-500 w-28 text-right truncate">
+                      <span className="hidden sm:inline text-xs text-gray-500 w-28 text-right truncate">
                         {assignee.full_name}
                       </span>
                     )}
 
                     <button
                       onClick={() => openEdit(task)}
-                      className="text-gray-400 hover:text-blue-600 transition"
+                      className="text-gray-400 hover:text-blue-600 transition flex-shrink-0"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />

@@ -111,23 +111,35 @@ export default function DashboardPage() {
                     const priority = priorityConfig[task.priority];
                     const status = statusConfig[task.status];
                     return (
-                      <div key={task.id} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50">
-                        <div className={`w-2 h-2 rounded-full ${priority.dot}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
-                          <p className="text-xs text-gray-500">
-                            {(task.elevator as unknown as { address: string })?.address || "—"}
-                          </p>
+                      <div key={task.id} className="px-4 md:px-6 py-3 hover:bg-gray-50">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${priority.dot}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {(task.elevator as unknown as { address: string })?.address || "—"}
+                            </p>
+                            {/* Badges below title on mobile */}
+                            <div className="flex items-center flex-wrap gap-2 mt-1 md:hidden">
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
+                                {priority.label}
+                              </span>
+                              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.text}`}>
+                                {status.label}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Inline badges on desktop */}
+                          <span className={`hidden md:inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
+                            {priority.label}
+                          </span>
+                          <span className={`hidden md:inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.text}`}>
+                            {status.label}
+                          </span>
+                          <span className="hidden md:inline text-xs text-gray-400 text-right">
+                            {(task.assigned_user as unknown as { full_name: string })?.full_name || "Μη ανατεθειμένο"}
+                          </span>
                         </div>
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
-                          {priority.label}
-                        </span>
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.text}`}>
-                          {status.label}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {(task.assigned_user as unknown as { full_name: string })?.full_name || "Μη ανατεθειμένο"}
-                        </span>
                       </div>
                     );
                   })}

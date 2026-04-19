@@ -136,13 +136,13 @@ export default function ElevatorsPage() {
 
         {/* Form Modal */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
                 {editing ? "Επεξεργασία Ασανσέρ" : "Νέο Ασανσέρ"}
               </h2>
               <form onSubmit={handleSave} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Διεύθυνση *" value={form.address} onChange={(v) => setForm({ ...form, address: v })} required />
                   <FormField label="Περιοχή" value={form.area} onChange={(v) => setForm({ ...form, area: v })} />
                   <FormField label="Όνομα Επικοινωνίας *" value={form.contact_name} onChange={(v) => setForm({ ...form, contact_name: v })} required />
@@ -203,8 +203,8 @@ export default function ElevatorsPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-gray-500">Δεν βρέθηκαν ασανσέρ</div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
+            <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <th className="px-6 py-3">Διεύθυνση</th>

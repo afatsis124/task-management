@@ -94,12 +94,12 @@ export default function ElevatorDetailPage() {
 
         {/* Header Card */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-gray-900">{elevator.address}</h1>
               <p className="text-sm text-gray-500 mt-1">{elevator.area}</p>
             </div>
-            <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-3 text-sm flex-shrink-0">
               <span className="font-bold text-gray-900">€{elevator.monthly_fee}/μήνα</span>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                 elevator.status === "active" ? "bg-green-100 text-green-700" :
@@ -137,7 +137,7 @@ export default function ElevatorDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4 w-fit">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4 overflow-x-auto">
           {([
             { key: "info", label: "Πληροφορίες" },
             { key: "tasks", label: `Εργασίες (${tasks.length})` },
@@ -146,7 +146,7 @@ export default function ElevatorDetailPage() {
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition ${
+              className={`px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap ${
                 tab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
             >
@@ -166,22 +166,32 @@ export default function ElevatorDetailPage() {
                   const priority = priorityConfig[task.priority];
                   const status = statusConfig[task.status];
                   return (
-                    <div key={task.id} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                        {task.due_date && (
-                          <p className="text-xs text-gray-500">Προθεσμία: {new Date(task.due_date).toLocaleDateString("el-GR")}</p>
-                        )}
+                    <div key={task.id} className="px-4 md:px-6 py-3 hover:bg-gray-50">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                          {task.due_date && (
+                            <p className="text-xs text-gray-500">Προθεσμία: {new Date(task.due_date).toLocaleDateString("el-GR")}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1 sm:hidden">
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
+                              {priority.label}
+                            </span>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.text}`}>
+                              {status.label}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`hidden sm:inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
+                          {priority.label}
+                        </span>
+                        <span className={`hidden sm:inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.text}`}>
+                          {status.label}
+                        </span>
+                        <span className="hidden sm:inline text-xs text-gray-400 w-24 text-right">
+                          {(task.assigned_user as unknown as { full_name: string })?.full_name || "—"}
+                        </span>
                       </div>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
-                        {priority.label}
-                      </span>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${status.bg} ${status.text}`}>
-                        {status.label}
-                      </span>
-                      <span className="text-xs text-gray-400 w-24 text-right">
-                        {(task.assigned_user as unknown as { full_name: string })?.full_name || "—"}
-                      </span>
                     </div>
                   );
                 })}
@@ -219,7 +229,7 @@ export default function ElevatorDetailPage() {
         {tab === "info" && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="font-semibold text-gray-900 mb-4">Σύνοψη</h3>
-            <div className="grid grid-cols-2 gap-6 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
               <div>
                 <p className="text-gray-500">Διεύθυνση</p>
                 <p className="font-medium text-gray-900">{elevator.address}, {elevator.area}</p>
