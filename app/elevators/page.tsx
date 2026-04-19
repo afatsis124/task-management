@@ -33,7 +33,7 @@ export default function ElevatorsPage() {
       certification_expiry: "",
       floors: "1",
       notes: "",
-      status: "active" as const,
+      status: "active" as "active" | "inactive" | "maintenance",
     };
   }
 
