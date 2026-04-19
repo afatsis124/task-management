@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 220 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+    --primary: 220 90% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 220 20% 20%;
+    --muted: 220 15% 95%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 220 15% 92%;
+    --accent-foreground: 220 20% 20%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 220 90% 50%;
+    --radius: 0.5rem;
+
+    /* Priority colors */
+    --sos: 0 84% 60%;
+    --sos-bg: 0 84% 97%;
+    --urgent: 38 92% 50%;
+    --urgent-bg: 38 92% 95%;
+    --normal: 220 90% 50%;
+    --normal-bg: 220 90% 97%;
+
+    /* Status colors */
+    --status-active: 142 76% 36%;
+    --status-pending: 38 92% 50%;
+    --status-completed: 142 76% 36%;
+    --status-cancelled: 0 0% 55%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+}
