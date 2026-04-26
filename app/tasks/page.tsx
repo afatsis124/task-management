@@ -50,7 +50,7 @@ export default function TasksPage() {
         .select("*, elevator:elevators(id, address, area), assigned_user:profiles(id, full_name)")
         .order("created_at", { ascending: false }),
       supabase.from("elevators").select("id, address, area").order("address"),
-      supabase.from("profiles").select("id, full_name, role"),
+      supabase.from("profiles").select("id, full_name, role, phone"),
     ]);
 
     if (tasksRes.data) setTasks(tasksRes.data as unknown as Task[]);
@@ -94,6 +94,21 @@ export default function TasksPage() {
       await supabase.from("tasks").update(payload).eq("id", editing.id);
     } else {
       await supabase.from("tasks").insert(payload);
+    }
+
+    if (form.priority === "sos" && form.assigned_to) {
+      const assignee = users.find((u) => u.id === form.assigned_to);
+      if (assignee?.phone) {
+        await fetch("/api/send-sms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: assignee.phone,
+            taskTitle: form.title,
+            assigneeName: assignee.full_name || assignee.email,
+          }),
+        }).catch((err) => console.error("SMS failed:", err));
+      }
     }
 
     setShowForm(false);
