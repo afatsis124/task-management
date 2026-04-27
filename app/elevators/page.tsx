@@ -120,6 +120,12 @@ export default function ElevatorsPage() {
     setShowForm(true);
   };
 
+  const deleteElevator = async (elevatorId: string) => {
+    if (!confirm("Διαγραφή ασανσέρ; Θα διαγραφούν και όλες οι σχετικές εργασίες.")) return;
+    await supabase.from("elevators").delete().eq("id", elevatorId);
+    fetchElevators();
+  };
+
   const filtered = elevators.filter(
     (e) =>
       e.address.toLowerCase().includes(search.toLowerCase()) ||
@@ -299,12 +305,14 @@ export default function ElevatorsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => openEdit(elevator)}
-                          className="text-sm text-gray-500 hover:text-blue-600"
-                        >
-                          Επεξεργασία
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => openEdit(elevator)} className="text-sm text-gray-500 hover:text-blue-600">
+                            Επεξεργασία
+                          </button>
+                          <button onClick={() => deleteElevator(elevator.id)} className="text-sm text-gray-400 hover:text-red-600">
+                            Διαγραφή
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
