@@ -102,6 +102,8 @@ export default function TasksPage() {
 
     if (form.assigned_to && (form.notify_sms || form.notify_email)) {
       const assignee = users.find((u) => u.id === form.assigned_to);
+      const elevator = elevators.find((e) => e.id === form.elevator_id);
+      const elevatorAddress = elevator ? `${elevator.address}, ${elevator.area}` : "";
       if (assignee) {
         const priorityLabel = form.priority === "sos" ? "SOS" : form.priority === "urgent" ? "Επείγον" : "Κανονικό";
         if (form.notify_sms && assignee.phone) {
@@ -113,6 +115,7 @@ export default function TasksPage() {
               taskTitle: form.title,
               assigneeName: assignee.full_name || assignee.email,
               priority: priorityLabel,
+              elevatorAddress,
             }),
           }).catch((err) => console.error("SMS failed:", err));
         }
@@ -127,6 +130,7 @@ export default function TasksPage() {
               priority: priorityLabel,
               description: form.description,
               due_date: form.due_date,
+              elevatorAddress,
             }),
           }).catch((err) => console.error("Email failed:", err));
         }

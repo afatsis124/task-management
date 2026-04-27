@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { to, taskTitle, assigneeName, priority } = await req.json();
+    const { to, taskTitle, assigneeName, priority, elevatorAddress } = await req.json();
 
     if (!to) {
       return NextResponse.json({ error: "Missing phone number" }, { status: 400 });
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
     const toFormatted = to.replace(/^\+/, "");
     const priorityLabel = priority ?? "Νεα εργασια";
-    const msg = `${priorityLabel}\nΤιτλος: ${taskTitle}\nΑνατεθηκε σε: ${assigneeName}`;
+    const msg = `${priorityLabel}\nΤιτλος: ${taskTitle}\nΟδος: ${elevatorAddress || "-"}\nΑνατεθηκε σε: ${assigneeName}`;
 
     const params = new URLSearchParams({
       username: process.env.BUDGETSMS_USERNAME!,

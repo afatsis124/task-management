@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
 
 export async function POST(req: NextRequest) {
   try {
-    const { to, taskTitle, assigneeName, priority, description, due_date } = await req.json();
+    const { to, taskTitle, assigneeName, priority, description, due_date, elevatorAddress } = await req.json();
 
     if (!to) {
       return NextResponse.json({ error: "Missing email" }, { status: 400 });
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
           <p style="font-size:15px">Σου ανατέθηκε νέα εργασία:</p>
           <div style="background:#f9fafb;border-left:4px solid ${priorityColor};padding:16px;border-radius:0 8px 8px 0;margin:16px 0">
             <p style="margin:0 0 8px;font-size:16px;font-weight:bold">${taskTitle}</p>
+            ${elevatorAddress ? `<p style="margin:0 0 8px;font-size:14px;color:#374151">📍 ${elevatorAddress}</p>` : ""}
             ${description ? `<p style="margin:0 0 8px;font-size:14px;color:#6b7280">${description}</p>` : ""}
             ${due_date ? `<p style="margin:0;font-size:13px;color:#6b7280">Προθεσμία: <strong>${new Date(due_date).toLocaleDateString("el-GR")}</strong></p>` : ""}
           </div>
