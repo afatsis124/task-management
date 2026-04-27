@@ -27,8 +27,58 @@ export interface Elevator {
   floors: number;
   notes?: string;
   status: "active" | "inactive" | "maintenance";
+  registry_number?: string;
+  protocol_number?: string;
+  office_name?: string;
+  office_address?: string;
+  office_email?: string;
+  office_phone?: string;
+  office_hours?: string;
   created_at: string;
   updated_at: string;
+}
+
+/* ───────────────────── Spare Parts ───────────────────── */
+
+export interface SparePart {
+  id: string;
+  elevator_id: string;
+  installation_date: string;
+  description: string;
+  price_without_vat: number | null;
+  price_with_vat: number | null;
+  debit_number?: string;
+  document_type: "sale_confirmation" | "cash_register" | null;
+  receipt_number?: string;
+  receipt_date: string | null;
+  payment_date: string | null;
+  created_at: string;
+}
+
+/* ───────────────────── Repair Documents ───────────────────── */
+
+export interface RepairDocument {
+  id: string;
+  elevator_id: string;
+  title: string;
+  description?: string;
+  pdf_url?: string;
+  status: "pending" | "in_progress" | "completed";
+  created_at: string;
+  updated_at: string;
+}
+
+/* ───────────────────── Payments ───────────────────── */
+
+export interface Payment {
+  id: string;
+  elevator_id: string;
+  month: number;
+  year: number;
+  invoice_date: string | null;
+  invoice_number?: string;
+  payment_date: string | null;
+  created_at: string;
 }
 
 /* ───────────────────── Task ───────────────────── */

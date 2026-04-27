@@ -74,6 +74,58 @@ CREATE TABLE IF NOT EXISTS appointments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 6. Spare parts
+CREATE TABLE IF NOT EXISTS spare_parts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  elevator_id UUID NOT NULL REFERENCES elevators(id) ON DELETE CASCADE,
+  installation_date DATE NOT NULL,
+  description TEXT NOT NULL,
+  price_without_vat NUMERIC(10,2),
+  price_with_vat NUMERIC(10,2),
+  debit_number TEXT,
+  document_type TEXT CHECK (document_type IN ('sale_confirmation', 'cash_register')),
+  receipt_number TEXT,
+  receipt_date DATE,
+  payment_date DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 7. Repair documents (with PDF upload)
+CREATE TABLE IF NOT EXISTS repair_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  elevator_id UUID NOT NULL REFERENCES elevators(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  pdf_url TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 8. Payments
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  elevator_id UUID NOT NULL REFERENCES elevators(id) ON DELETE CASCADE,
+  month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+  year INTEGER NOT NULL,
+  invoice_date DATE,
+  invoice_number TEXT,
+  payment_date DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================
+-- New elevator columns
+-- ============================================
+ALTER TABLE elevators
+  ADD COLUMN IF NOT EXISTS registry_number TEXT,
+  ADD COLUMN IF NOT EXISTS protocol_number TEXT,
+  ADD COLUMN IF NOT EXISTS office_name TEXT,
+  ADD COLUMN IF NOT EXISTS office_address TEXT,
+  ADD COLUMN IF NOT EXISTS office_email TEXT,
+  ADD COLUMN IF NOT EXISTS office_phone TEXT,
+  ADD COLUMN IF NOT EXISTS office_hours TEXT;
+
 -- ============================================
 -- Indexes
 -- ============================================
@@ -85,6 +137,26 @@ CREATE INDEX IF NOT EXISTS idx_repair_history_elevator ON repair_history(elevato
 CREATE INDEX IF NOT EXISTS idx_appointments_elevator ON appointments(elevator_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
 CREATE INDEX IF NOT EXISTS idx_elevators_status ON elevators(status);
+CREATE INDEX IF NOT EXISTS idx_spare_parts_elevator ON spare_parts(elevator_id);
+CREATE INDEX IF NOT EXISTS idx_repair_documents_elevator ON repair_documents(elevator_id);
+CREATE INDEX IF NOT EXISTS idx_payments_elevator ON payments(elevator_id);
+CREATE INDEX IF NOT EXISTS idx_payments_year_month ON payments(year, month);
+
+-- ============================================
+-- RLS for new tables
+-- ============================================
+ALTER TABLE spare_parts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE repair_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can manage spare_parts"
+  ON spare_parts FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can manage repair_documents"
+  ON repair_documents FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can manage payments"
+  ON payments FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ============================================
 -- Trigger: auto-create profile on signup

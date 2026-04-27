@@ -34,6 +34,13 @@ export default function ElevatorsPage() {
       floors: "1",
       notes: "",
       status: "active" as "active" | "inactive" | "maintenance",
+      registry_number: "",
+      protocol_number: "",
+      office_name: "",
+      office_address: "",
+      office_email: "",
+      office_phone: "",
+      office_hours: "",
     };
   }
 
@@ -66,6 +73,13 @@ export default function ElevatorsPage() {
       floors: parseInt(form.floors) || 1,
       notes: form.notes || null,
       status: form.status,
+      registry_number: form.registry_number || null,
+      protocol_number: form.protocol_number || null,
+      office_name: form.office_name || null,
+      office_address: form.office_address || null,
+      office_email: form.office_email || null,
+      office_phone: form.office_phone || null,
+      office_hours: form.office_hours || null,
     };
 
     if (editing) {
@@ -95,6 +109,13 @@ export default function ElevatorsPage() {
       floors: elevator.floors.toString(),
       notes: elevator.notes || "",
       status: elevator.status,
+      registry_number: elevator.registry_number || "",
+      protocol_number: elevator.protocol_number || "",
+      office_name: elevator.office_name || "",
+      office_address: elevator.office_address || "",
+      office_email: elevator.office_email || "",
+      office_phone: elevator.office_phone || "",
+      office_hours: elevator.office_hours || "",
     });
     setShowForm(true);
   };
@@ -165,6 +186,24 @@ export default function ElevatorsPage() {
                     </select>
                   </div>
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField label="Αρ. Καταχώρησης Μητρώου" value={form.registry_number} onChange={(v) => setForm({ ...form, registry_number: v })} />
+                  <FormField label="Αρ. Πρωτοκόλλου Δήμου" value={form.protocol_number} onChange={(v) => setForm({ ...form, protocol_number: v })} />
+                </div>
+
+                <div className="border-t border-gray-200 pt-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-3">Γραφείο Κοινοχρήστων</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField label="Όνομα" value={form.office_name} onChange={(v) => setForm({ ...form, office_name: v })} />
+                    <FormField label="Τηλέφωνο" value={form.office_phone} onChange={(v) => setForm({ ...form, office_phone: v })} />
+                    <FormField label="Διεύθυνση" value={form.office_address} onChange={(v) => setForm({ ...form, office_address: v })} />
+                    <FormField label="Email" type="email" value={form.office_email} onChange={(v) => setForm({ ...form, office_email: v })} />
+                    <div className="sm:col-span-2">
+                      <FormField label="Ωράριο Λειτουργίας" value={form.office_hours} onChange={(v) => setForm({ ...form, office_hours: v })} />
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Σημειώσεις</label>
                   <textarea
