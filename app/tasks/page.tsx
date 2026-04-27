@@ -41,6 +41,8 @@ export default function TasksPage() {
     priority: "normal" as TaskPriority,
     status: "pending" as TaskStatus,
     due_date: "",
+    notify_sms: false,
+    notify_email: false,
   });
 
   const fetchData = useCallback(async () => {
@@ -50,7 +52,7 @@ export default function TasksPage() {
         .select("*, elevator:elevators(id, address, area), assigned_user:profiles(id, full_name)")
         .order("created_at", { ascending: false }),
       supabase.from("elevators").select("id, address, area").order("address"),
-      supabase.from("profiles").select("id, full_name, role, phone"),
+      supabase.from("profiles").select("id, full_name, role, phone, email"),
     ]);
 
     if (tasksRes.data) setTasks(tasksRes.data as unknown as Task[]);
@@ -72,6 +74,8 @@ export default function TasksPage() {
       priority: "normal",
       status: "pending",
       due_date: "",
+      notify_sms: false,
+      notify_email: false,
     });
   };
 
@@ -96,18 +100,36 @@ export default function TasksPage() {
       await supabase.from("tasks").insert(payload);
     }
 
-    if (form.priority === "sos" && form.assigned_to) {
+    if (form.assigned_to && (form.notify_sms || form.notify_email)) {
       const assignee = users.find((u) => u.id === form.assigned_to);
-      if (assignee?.phone) {
-        await fetch("/api/send-sms", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: assignee.phone,
-            taskTitle: form.title,
-            assigneeName: assignee.full_name || assignee.email,
-          }),
-        }).catch((err) => console.error("SMS failed:", err));
+      if (assignee) {
+        const priorityLabel = form.priority === "sos" ? "SOS" : form.priority === "urgent" ? "Επείγον" : "Κανονικό";
+        if (form.notify_sms && assignee.phone) {
+          await fetch("/api/send-sms", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: assignee.phone,
+              taskTitle: form.title,
+              assigneeName: assignee.full_name || assignee.email,
+              priority: priorityLabel,
+            }),
+          }).catch((err) => console.error("SMS failed:", err));
+        }
+        if (form.notify_email && assignee.email) {
+          await fetch("/api/send-task-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: assignee.email,
+              taskTitle: form.title,
+              assigneeName: assignee.full_name || assignee.email,
+              priority: priorityLabel,
+              description: form.description,
+              due_date: form.due_date,
+            }),
+          }).catch((err) => console.error("Email failed:", err));
+        }
       }
     }
 
@@ -128,6 +150,8 @@ export default function TasksPage() {
       priority: task.priority,
       status: task.status,
       due_date: task.due_date || "",
+      notify_sms: false,
+      notify_email: false,
     });
     setShowForm(true);
   };
@@ -309,6 +333,33 @@ export default function TasksPage() {
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
+                </div>
+
+                <div className="border-t border-gray-100 pt-3">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Ειδοποίηση</p>
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.notify_sms}
+                        onChange={(e) => setForm({ ...form, notify_sms: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">SMS</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.notify_email}
+                        onChange={(e) => setForm({ ...form, notify_email: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">Email</span>
+                    </label>
+                  </div>
+                  {(form.notify_sms || form.notify_email) && !form.assigned_to && (
+                    <p className="text-xs text-amber-600 mt-1">Επέλεξε χρήστη για να σταλεί ειδοποίηση.</p>
+                  )}
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">
