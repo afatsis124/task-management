@@ -103,7 +103,7 @@ export default function Sidebar({ user, mobileOpen, onMobileClose }: SidebarProp
               </svg>
             </div>
             <span className={`font-bold text-gray-900 text-sm truncate ${collapsed ? "md:hidden" : ""}`}>
-              Elevator Mgmt
+              HouseLift
             </span>
           </div>
           {/* Desktop: collapse toggle */}
