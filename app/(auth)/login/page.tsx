@@ -89,14 +89,6 @@ export default function LoginPage() {
             {loading ? "Σύνδεση..." : "Σύνδεση"}
           </button>
 
-          <div className="flex items-center justify-between text-sm">
-            <Link href="/forgot-password" className="text-blue-600 hover:underline">
-              Ξέχασα τον κωδικό
-            </Link>
-            <Link href="/signup" className="text-blue-600 hover:underline">
-              Εγγραφή
-            </Link>
-          </div>
         </form>
       </div>
     </div>
