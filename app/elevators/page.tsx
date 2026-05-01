@@ -23,6 +23,7 @@ export default function ElevatorsPage() {
 
   function getEmptyForm() {
     return {
+      type: "residential" as "residential" | "professional",
       address: "",
       area: "",
       contact_name: "",
@@ -62,6 +63,7 @@ export default function ElevatorsPage() {
     setSaving(true);
 
     const payload = {
+      type: form.type,
       address: form.address,
       area: form.area,
       contact_name: form.contact_name,
@@ -98,6 +100,7 @@ export default function ElevatorsPage() {
   const openEdit = (elevator: Elevator) => {
     setEditing(elevator);
     setForm({
+      type: elevator.type ?? "residential",
       address: elevator.address,
       area: elevator.area,
       contact_name: elevator.contact_name,
@@ -169,6 +172,24 @@ export default function ElevatorsPage() {
                 {editing ? "Επεξεργασία Ασανσέρ" : "Νέο Ασανσέρ"}
               </h2>
               <form onSubmit={handleSave} className="space-y-4">
+                {/* Type selector */}
+                <div className="flex gap-2">
+                  {(["residential", "professional"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setForm({ ...form, type: t })}
+                      className={`flex-1 py-2 text-sm font-medium rounded-lg border transition ${
+                        form.type === t
+                          ? "bg-blue-600 border-blue-600 text-white"
+                          : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {t === "residential" ? "Οικιακό" : "Επαγγελματικό"}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Διεύθυνση *" value={form.address} onChange={(v) => setForm({ ...form, address: v })} required />
                   <FormField label="Περιοχή" value={form.area} onChange={(v) => setForm({ ...form, area: v })} />
@@ -197,18 +218,20 @@ export default function ElevatorsPage() {
                   <FormField label="Αρ. Πρωτοκόλλου Δήμου" value={form.protocol_number} onChange={(v) => setForm({ ...form, protocol_number: v })} />
                 </div>
 
-                <div className="border-t border-gray-200 pt-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-3">Γραφείο Κοινοχρήστων</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField label="Όνομα" value={form.office_name} onChange={(v) => setForm({ ...form, office_name: v })} />
-                    <FormField label="Τηλέφωνο" value={form.office_phone} onChange={(v) => setForm({ ...form, office_phone: v })} />
-                    <FormField label="Διεύθυνση" value={form.office_address} onChange={(v) => setForm({ ...form, office_address: v })} />
-                    <FormField label="Email" type="email" value={form.office_email} onChange={(v) => setForm({ ...form, office_email: v })} />
-                    <div className="sm:col-span-2">
-                      <FormField label="Ωράριο Λειτουργίας" value={form.office_hours} onChange={(v) => setForm({ ...form, office_hours: v })} />
+                {form.type === "residential" && (
+                  <div className="border-t border-gray-200 pt-4">
+                    <p className="text-sm font-semibold text-gray-700 mb-3">Γραφείο Κοινοχρήστων</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FormField label="Όνομα" value={form.office_name} onChange={(v) => setForm({ ...form, office_name: v })} />
+                      <FormField label="Τηλέφωνο" value={form.office_phone} onChange={(v) => setForm({ ...form, office_phone: v })} />
+                      <FormField label="Διεύθυνση" value={form.office_address} onChange={(v) => setForm({ ...form, office_address: v })} />
+                      <FormField label="Email" type="email" value={form.office_email} onChange={(v) => setForm({ ...form, office_email: v })} />
+                      <div className="sm:col-span-2">
+                        <FormField label="Ωράριο Λειτουργίας" value={form.office_hours} onChange={(v) => setForm({ ...form, office_hours: v })} />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Σημειώσεις</label>
@@ -253,6 +276,7 @@ export default function ElevatorsPage() {
               <thead>
                 <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <th className="px-6 py-3">Διεύθυνση</th>
+                  <th className="px-6 py-3">Τύπος</th>
                   <th className="px-6 py-3">Επαφή</th>
                   <th className="px-6 py-3">Τηλέφωνο</th>
                   <th className="px-6 py-3">€/μήνα</th>
@@ -278,6 +302,11 @@ export default function ElevatorsPage() {
                           {elevator.address}
                         </Link>
                         <p className="text-xs text-gray-500">{elevator.area}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${elevator.type === "professional" ? "bg-purple-100 text-purple-700" : "bg-blue-50 text-blue-600"}`}>
+                          {elevator.type === "professional" ? "Επαγγελματικό" : "Οικιακό"}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">{elevator.contact_name}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{elevator.contact_phone}</td>

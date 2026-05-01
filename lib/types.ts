@@ -26,6 +26,7 @@ export interface Elevator {
   certification_expiry: string | null;
   floors: number;
   notes?: string;
+  type: "residential" | "professional";
   status: "active" | "inactive" | "maintenance";
   registry_number?: string;
   protocol_number?: string;
@@ -78,6 +79,7 @@ export interface Payment {
   invoice_date: string | null;
   invoice_number?: string;
   payment_date: string | null;
+  notes?: string;
   created_at: string;
 }
 
