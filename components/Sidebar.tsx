@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useState } from "react";
 import type { UserProfile } from "@/lib/types";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const navItems = [
   {
@@ -177,6 +178,9 @@ export default function Sidebar({ user, mobileOpen, onMobileClose }: SidebarProp
               <p className="text-xs text-gray-500 capitalize">{user.role}</p>
             </div>
           )}
+          <div className="mb-2">
+            <ThemeToggle compact={collapsed} />
+          </div>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition"

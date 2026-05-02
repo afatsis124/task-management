@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -17,10 +17,24 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    if (!isSupabaseConfigured) {
+      setError("Local Supabase settings are missing. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, then restart npm run dev.");
+      setLoading(false);
+      return;
+    }
+
+    let authError: Error | null = null;
+    try {
+      const result = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      authError = result.error;
+    } catch {
+      setError("Could not reach Supabase. Check your local .env.local values and internet connection.");
+      setLoading(false);
+      return;
+    }
 
     if (authError) {
       setError(authError.message);

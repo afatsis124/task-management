@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Sidebar from "@/components/Sidebar";
 import type { UserProfile } from "@/lib/types";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -80,6 +81,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </svg>
             </div>
             <span className="font-semibold text-gray-900 text-sm">HouseLift</span>
+          </div>
+          <div className="ml-auto">
+            <ThemeToggle compact />
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
