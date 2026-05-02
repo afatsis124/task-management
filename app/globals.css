@@ -96,8 +96,57 @@
   }
 
   .dark .bg-blue-50,
-  .dark .hover\:bg-blue-50:hover {
-    background-color: hsl(217 91% 18%);
+  .dark .bg-blue-100,
+  .dark .hover\:bg-blue-50:hover,
+  .dark .hover\:bg-blue-100:hover {
+    background-color: hsl(217 86% 18%);
+  }
+
+  .dark .bg-green-50,
+  .dark .bg-green-50\/30,
+  .dark .bg-green-100,
+  .dark .hover\:bg-green-50:hover,
+  .dark .hover\:bg-green-100:hover,
+  .dark .hover\:bg-green-200:hover {
+    background-color: hsl(150 72% 15%);
+  }
+
+  .dark .bg-emerald-50,
+  .dark .bg-emerald-100 {
+    background-color: hsl(162 72% 14%);
+  }
+
+  .dark .bg-amber-50,
+  .dark .bg-amber-100,
+  .dark .hover\:bg-amber-100:hover,
+  .dark .hover\:bg-amber-200:hover,
+  .dark .bg-yellow-50,
+  .dark .bg-yellow-100 {
+    background-color: hsl(38 86% 16%);
+  }
+
+  .dark .bg-orange-50,
+  .dark .bg-orange-100 {
+    background-color: hsl(24 88% 16%);
+  }
+
+  .dark .bg-red-50,
+  .dark .bg-red-100,
+  .dark .hover\:bg-red-50:hover,
+  .dark .hover\:bg-red-100:hover {
+    background-color: hsl(0 72% 17%);
+  }
+
+  .dark .bg-rose-50,
+  .dark .bg-rose-100 {
+    background-color: hsl(345 76% 17%);
+  }
+
+  .dark .bg-purple-50,
+  .dark .bg-purple-100,
+  .dark .bg-violet-50,
+  .dark .bg-violet-100 {
+    background-color: hsl(259 70% 18%);
   }
 
   .dark .text-gray-900,
@@ -124,6 +173,55 @@
     color: hsl(220 12% 58%);
   }
 
+  .dark .text-blue-600,
+  .dark .hover\:text-blue-600:hover,
+  .dark .text-blue-700 {
+    color: hsl(216 100% 72%);
+  }
+
+  .dark .text-green-600,
+  .dark .text-green-700 {
+    color: hsl(151 78% 68%);
+  }
+
+  .dark .text-emerald-600,
+  .dark .text-emerald-700 {
+    color: hsl(163 82% 65%);
+  }
+
+  .dark .text-amber-600,
+  .dark .text-amber-700,
+  .dark .text-yellow-600,
+  .dark .text-yellow-700 {
+    color: hsl(43 96% 68%);
+  }
+
+  .dark .text-orange-600,
+  .dark .text-orange-700 {
+    color: hsl(28 96% 68%);
+  }
+
+  .dark .text-red-400,
+  .dark .text-red-500,
+  .dark .hover\:text-red-600:hover,
+  .dark .text-red-600,
+  .dark .hover\:text-red-700:hover,
+  .dark .text-red-700 {
+    color: hsl(0 94% 75%);
+  }
+
+  .dark .text-rose-600,
+  .dark .text-rose-700 {
+    color: hsl(345 96% 75%);
+  }
+
+  .dark .text-purple-600,
+  .dark .text-purple-700,
+  .dark .text-violet-600,
+  .dark .text-violet-700 {
+    color: hsl(261 96% 78%);
+  }
+
   .dark .border-gray-100,
   .dark .border-gray-200,
   .dark .border-gray-300,
@@ -144,5 +242,68 @@
 
   .dark .file\:bg-blue-50::file-selector-button {
     background-color: hsl(217 91% 18%);
+  }
+
+  .dark .border-blue-100,
+  .dark .border-blue-200,
+  .dark .focus\:border-blue-500:focus {
+    border-color: hsl(217 78% 40%);
+  }
+
+  .dark .border-green-100,
+  .dark .border-green-200,
+  .dark .hover\:border-green-500:hover {
+    border-color: hsl(150 62% 38%);
+  }
+
+  .dark .border-emerald-100,
+  .dark .border-emerald-200 {
+    border-color: hsl(162 62% 36%);
+  }
+
+  .dark .border-amber-100,
+  .dark .border-amber-200,
+  .dark .border-yellow-100,
+  .dark .border-yellow-200 {
+    border-color: hsl(38 74% 42%);
+  }
+
+  .dark .border-orange-100,
+  .dark .border-orange-200 {
+    border-color: hsl(24 74% 42%);
+  }
+
+  .dark .border-red-100,
+  .dark .border-red-200 {
+    border-color: hsl(0 62% 42%);
+  }
+
+  .dark .border-rose-100,
+  .dark .border-rose-200 {
+    border-color: hsl(345 62% 42%);
+  }
+
+  .dark .border-purple-100,
+  .dark .border-purple-200,
+  .dark .border-violet-100,
+  .dark .border-violet-200 {
+    border-color: hsl(259 62% 44%);
+  }
+
+  .dark .ring-blue-200 {
+    --tw-ring-color: hsl(217 78% 40%);
+  }
+
+  .dark .ring-green-200 {
+    --tw-ring-color: hsl(150 62% 38%);
+  }
+
+  .dark .ring-amber-200,
+  .dark .ring-yellow-200 {
+    --tw-ring-color: hsl(38 74% 42%);
+  }
+
+  .dark .ring-red-200 {
+    --tw-ring-color: hsl(0 62% 42%);
   }
 }
