@@ -37,23 +37,25 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={isDark}
       onClick={toggleTheme}
-      className={`flex items-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 ${
-        compact ? "h-9 w-9 justify-center" : "w-full gap-3 px-3 py-2 text-sm"
-      }`}
+      className={`theme-switch ${compact ? "" : "mx-auto"}`}
+      data-theme={theme}
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
       title={isDark ? "Light theme" : "Dark theme"}
     >
-      {isDark ? (
-        <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <span className="theme-switch__icon theme-switch__icon--sun" aria-hidden="true">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m8.66-13.66-.7.7M4.04 19.96l-.7.7M21 12h-1M4 12H3m16.96 7.96-.7-.7M4.04 4.04l-.7-.7M12 8a4 4 0 100 8 4 4 0 000-8z" />
         </svg>
-      ) : (
-        <svg className="h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      </span>
+      <span className="theme-switch__icon theme-switch__icon--moon" aria-hidden="true">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.35 15.35A9 9 0 018.65 3.65 7 7 0 1012 21a8.96 8.96 0 008.35-5.65z" />
         </svg>
-      )}
-      {!compact && <span>{isDark ? "Light theme" : "Dark theme"}</span>}
+      </span>
+      <span className="theme-switch__thumb" aria-hidden="true" />
     </button>
   );
 }
