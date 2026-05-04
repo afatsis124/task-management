@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
             <div className="p-4 bg-green-50 text-green-700 rounded-lg mb-4">
               Ελέγξε το email σου για τον σύνδεσμο επαναφοράς κωδικού.
             </div>
-            <Link href="/login" className="text-blue-600 hover:underline text-sm">
+            <Link href="/sign-in" className="text-blue-600 hover:underline text-sm">
               Πίσω στη σύνδεση
             </Link>
           </div>
@@ -77,7 +77,7 @@ export default function ForgotPasswordPage() {
             </button>
 
             <p className="text-center text-sm text-gray-500">
-              <Link href="/login" className="text-blue-600 hover:underline">
+              <Link href="/sign-in" className="text-blue-600 hover:underline">
                 Πίσω στη σύνδεση
               </Link>
             </p>

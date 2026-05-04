@@ -9,6 +9,13 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: "/", destination: "/house-lift.html" },
+      ],
+    };
+  },
 };
 
 export default nextConfig;

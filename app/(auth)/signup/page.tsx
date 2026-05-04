@@ -32,7 +32,7 @@ export default function SignupPage() {
       return;
     }
 
-    router.push("/login?registered=true");
+    router.push("/sign-in?registered=true");
   };
 
   return (
@@ -111,7 +111,7 @@ export default function SignupPage() {
 
           <p className="text-center text-sm text-gray-500">
             Έχεις ήδη λογαριασμό;{" "}
-            <Link href="/login" className="text-blue-600 hover:underline">
+            <Link href="/sign-in" className="text-blue-600 hover:underline">
               Σύνδεση
             </Link>
           </p>
