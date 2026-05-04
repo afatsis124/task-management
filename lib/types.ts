@@ -35,6 +35,7 @@ export interface Elevator {
   office_email?: string;
   office_phone?: string;
   office_hours?: string;
+  afm?: string;
   created_at: string;
   updated_at: string;
 }

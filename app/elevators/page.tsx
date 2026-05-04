@@ -42,6 +42,7 @@ export default function ElevatorsPage() {
       office_email: "",
       office_phone: "",
       office_hours: "",
+      afm: "",
     };
   }
 
@@ -82,6 +83,7 @@ export default function ElevatorsPage() {
       office_email: form.office_email || null,
       office_phone: form.office_phone || null,
       office_hours: form.office_hours || null,
+      afm: form.afm || null,
     };
 
     if (editing) {
@@ -119,6 +121,7 @@ export default function ElevatorsPage() {
       office_email: elevator.office_email || "",
       office_phone: elevator.office_phone || "",
       office_hours: elevator.office_hours || "",
+      afm: elevator.afm || "",
     });
     setShowForm(true);
   };
@@ -216,6 +219,9 @@ export default function ElevatorsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Αρ. Καταχώρησης Μητρώου" value={form.registry_number} onChange={(v) => setForm({ ...form, registry_number: v })} />
                   <FormField label="Αρ. Πρωτοκόλλου Δήμου" value={form.protocol_number} onChange={(v) => setForm({ ...form, protocol_number: v })} />
+                  {form.type === "professional" && (
+                    <FormField label="ΑΦΜ" value={form.afm} onChange={(v) => setForm({ ...form, afm: v })} />
+                  )}
                 </div>
 
                 {form.type === "residential" && (
