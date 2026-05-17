@@ -191,7 +191,7 @@ export default function MaintenancePage() {
   }, {});
 
   const groupKeys = Object.keys(groupedDue).sort((a, b) =>
-    a === "—" ? 1 : b === "—" ? -1 : a.localeCompare(b)
+    a === "—" ? 1 : b === "—" ? -1 : a.localeCompare(b, undefined, { numeric: true })
   );
 
   return (
