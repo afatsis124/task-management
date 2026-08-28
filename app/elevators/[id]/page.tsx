@@ -24,6 +24,38 @@ const repairStatusConfig = {
 };
 const GREEK_MONTHS = ["", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος", "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος"];
 type Tab = "info" | "tasks" | "repairs" | "spare_parts" | "repair_docs" | "payments";
+/**
+ * Supabase Storage rejects filenames containing Greek letters, spaces or most
+ * punctuation ("Invalid key"). This turns any filename into a safe key while
+ * keeping it readable: "ΠΡΟΣΦΟΡΑ ΕΡΑΤΥΡΑΣ 19.pdf" -> "prosfora-eratyras-19.pdf".
+ */
+const GREEK_TO_LATIN: Record<string, string> = {
+  "\u03b1": "a", "\u03b2": "v", "\u03b3": "g", "\u03b4": "d", "\u03b5": "e",
+  "\u03b6": "z", "\u03b7": "i", "\u03b8": "th", "\u03b9": "i", "\u03ba": "k",
+  "\u03bb": "l", "\u03bc": "m", "\u03bd": "n", "\u03be": "x", "\u03bf": "o",
+  "\u03c0": "p", "\u03c1": "r", "\u03c3": "s", "\u03c2": "s", "\u03c4": "t",
+  "\u03c5": "y", "\u03c6": "f", "\u03c7": "ch", "\u03c8": "ps", "\u03c9": "o",
+};
+function cleanFilenamePart(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .split("")
+    .map((ch) => GREEK_TO_LATIN[ch] ?? ch)
+    .join("")
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+}
+function toStorageKey(fileName: string): string {
+  const dot = fileName.lastIndexOf(".");
+  const rawBase = dot > 0 ? fileName.slice(0, dot) : fileName;
+  const rawExt = dot > 0 ? fileName.slice(dot + 1) : "";
+  const base = cleanFilenamePart(rawBase).slice(0, 60) || "file";
+  const ext = cleanFilenamePart(rawExt) || "pdf";
+  return `${base}.${ext}`;
+}
 export default function ElevatorDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -145,7 +177,7 @@ export default function ElevatorDetailPage() {
   // ── Repair docs CRUD ──
   const handlePdfUpload = async (file: File): Promise<string | null> => {
     setUploadingPdf(true);
-    const path = `${id}/${Date.now()}_${file.name}`;
+    const path = `${id}/${Date.now()}_${toStorageKey(file.name)}`;
     const { error } = await supabase.storage.from("repair-pdfs").upload(path, file);
     setUploadingPdf(false);
     if (error) { alert("Σφάλμα upload: " + error.message); return null; }
