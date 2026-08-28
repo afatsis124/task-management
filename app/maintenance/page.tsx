@@ -1,17 +1,14 @@
 "use client";
-
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AppLayout from "@/components/AppLayout";
 import type { Elevator } from "@/lib/types";
-
 interface MaintenanceSchedule {
   id: string;
   elevator_id: string;
   frequency_months: 1 | 2 | 3 | 12;
   group_name: string | null;
 }
-
 interface MaintenanceRecord {
   id: string;
   elevator_id: string;
@@ -19,27 +16,25 @@ interface MaintenanceRecord {
   year: number;
   done_at: string | null;
   needs_payment: boolean;
+  // Set when the money was actually collected; null means still outstanding.
+  payment_collected_at: string | null;
   notes: string | null;
 }
-
 interface ElevatorRow {
   elevator: Elevator;
   schedule: MaintenanceSchedule | null;
   record: MaintenanceRecord | null;
   isDue: boolean;
 }
-
 const FREQUENCY_LABELS: Record<number, string> = {
   1: "Κάθε μήνα",
   2: "Κάθε 2 μήνες",
   3: "Κάθε 3 μήνες",
   12: "Κάθε χρόνο",
 };
-
 function isDueThisMonth(frequency: number, month: number): boolean {
   return month % frequency === 0;
 }
-
 export default function MaintenancePage() {
   const [elevators, setElevators] = useState<Elevator[]>([]);
   const [schedules, setSchedules] = useState<MaintenanceSchedule[]>([]);
@@ -48,11 +43,9 @@ export default function MaintenancePage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const notesRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-
   const fetchData = useCallback(async () => {
     const [elevatorsRes, schedulesRes, recordsRes] = await Promise.all([
       supabase.from("elevators").select("*").eq("status", "active").order("address"),
@@ -63,17 +56,14 @@ export default function MaintenancePage() {
         .eq("month", selectedMonth)
         .eq("year", selectedYear),
     ]);
-
     if (elevatorsRes.data) setElevators(elevatorsRes.data as Elevator[]);
     if (schedulesRes.data) setSchedules(schedulesRes.data as MaintenanceSchedule[]);
     if (recordsRes.data) setRecords(recordsRes.data as MaintenanceRecord[]);
     setLoading(false);
   }, [selectedMonth, selectedYear]);
-
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
   const getOrCreateRecord = async (elevatorId: string): Promise<MaintenanceRecord> => {
     const existing = records.find((r) => r.elevator_id === elevatorId);
     if (existing) return existing;
@@ -84,7 +74,6 @@ export default function MaintenancePage() {
       .single();
     return data as MaintenanceRecord;
   };
-
   const updateFrequency = async (elevatorId: string, frequency: number) => {
     const existing = schedules.find((s) => s.elevator_id === elevatorId);
     if (existing) {
@@ -94,7 +83,6 @@ export default function MaintenancePage() {
     }
     fetchData();
   };
-
   const updateGroup = async (elevatorId: string, groupName: string) => {
     const existing = schedules.find((s) => s.elevator_id === elevatorId);
     const val = groupName.trim() || null;
@@ -105,7 +93,6 @@ export default function MaintenancePage() {
     }
     fetchData();
   };
-
   const toggleDone = async (elevatorId: string, currentRecord: MaintenanceRecord | null) => {
     setSaving(elevatorId);
     if (currentRecord) {
@@ -125,7 +112,6 @@ export default function MaintenancePage() {
     await fetchData();
     setSaving(null);
   };
-
   const toggleNeedsPayment = async (elevatorId: string, currentRecord: MaintenanceRecord | null) => {
     setSaving(elevatorId + "_pay");
     let rec = currentRecord;
@@ -137,14 +123,24 @@ export default function MaintenancePage() {
     await fetchData();
     setSaving(null);
   };
-
+  // Confirms the money was actually collected during the visit (or clears it again).
+  const togglePaymentCollected = async (elevatorId: string, currentRecord: MaintenanceRecord | null) => {
+    setSaving(elevatorId + "_collected");
+    let rec = currentRecord;
+    if (!rec) rec = await getOrCreateRecord(elevatorId);
+    await supabase
+      .from("maintenance_records")
+      .update({ payment_collected_at: rec.payment_collected_at ? null : new Date().toISOString() })
+      .eq("id", rec.id);
+    await fetchData();
+    setSaving(null);
+  };
   const saveNotes = async (elevatorId: string, notes: string, currentRecord: MaintenanceRecord | null) => {
     let rec = currentRecord;
     if (!rec) rec = await getOrCreateRecord(elevatorId);
     await supabase.from("maintenance_records").update({ notes: notes || null }).eq("id", rec.id);
     await fetchData();
   };
-
   const handleNotesChange = (elevatorId: string, value: string, record: MaintenanceRecord | null) => {
     setRecords((prev) =>
       prev.map((r) => (r.elevator_id === elevatorId ? { ...r, notes: value } : r))
@@ -152,7 +148,6 @@ export default function MaintenancePage() {
     if (notesRefs.current[elevatorId]) clearTimeout(notesRefs.current[elevatorId]);
     notesRefs.current[elevatorId] = setTimeout(() => saveNotes(elevatorId, value, record), 800);
   };
-
   const toggleNotesExpanded = (elevatorId: string) => {
     setExpandedNotes((prev) => {
       const next = new Set(prev);
@@ -161,7 +156,6 @@ export default function MaintenancePage() {
       return next;
     });
   };
-
   const rows: ElevatorRow[] = elevators.map((elevator) => {
     const schedule = schedules.find((s) => s.elevator_id === elevator.id) || null;
     const frequency = schedule?.frequency_months ?? 1;
@@ -169,19 +163,19 @@ export default function MaintenancePage() {
     const record = records.find((r) => r.elevator_id === elevator.id) || null;
     return { elevator, schedule, record, isDue };
   });
-
   const dueRows = rows.filter((r) => r.isDue);
   const doneCount = dueRows.filter((r) => r.record?.done_at).length;
   const totalDue = dueRows.length;
   const progressPct = totalDue > 0 ? Math.round((doneCount / totalDue) * 100) : 0;
-
+  // How many of this month's payable visits have actually been collected.
+  const payableRows = dueRows.filter((r) => r.record?.needs_payment);
+  const collectedCount = payableRows.filter((r) => r.record?.payment_collected_at).length;
+  const outstandingCount = payableRows.length - collectedCount;
   const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString("el-GR", {
     month: "long",
     year: "numeric",
   });
-
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
-
   // Group due rows by group_name
   const groupedDue = dueRows.reduce<Record<string, ElevatorRow[]>>((acc, row) => {
     const key = row.schedule?.group_name || "—";
@@ -189,11 +183,9 @@ export default function MaintenancePage() {
     acc[key].push(row);
     return acc;
   }, {});
-
   const groupKeys = Object.keys(groupedDue).sort((a, b) =>
     a === "—" ? 1 : b === "—" ? -1 : a.localeCompare(b, undefined, { numeric: true })
   );
-
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto">
@@ -220,7 +212,6 @@ export default function MaintenancePage() {
             </select>
           </div>
         </div>
-
         {/* Progress bar */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
@@ -236,8 +227,19 @@ export default function MaintenancePage() {
             />
           </div>
           <p className="text-xs text-gray-500 mt-1 text-right">{progressPct}%</p>
+          {/* Collection summary */}
+          {payableRows.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+              <span className="text-gray-500">Εισπράξεις</span>
+              <span className="font-medium">
+                <span className="text-green-600">{collectedCount} εισπράχθηκαν</span>
+                {outstandingCount > 0 && (
+                  <span className="text-amber-600"> · {outstandingCount} εκκρεμούν</span>
+                )}
+              </span>
+            </div>
+          )}
         </div>
-
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -260,21 +262,21 @@ export default function MaintenancePage() {
                     </h3>
                     <span className="text-xs text-gray-400">{groupDone}/{groupRows.length}</span>
                   </div>
-
                   <div className="space-y-2">
                     {groupRows.map(({ elevator, schedule, record }) => {
                       const isDone = !!record?.done_at;
                       const needsPayment = !!record?.needs_payment;
+                      const paymentCollected = !!record?.payment_collected_at;
                       const isSavingCheck = saving === elevator.id;
                       const isSavingPay = saving === elevator.id + "_pay";
+                      const isSavingCollected = saving === elevator.id + "_collected";
                       const notesOpen = expandedNotes.has(elevator.id);
                       const notesValue = record?.notes ?? "";
-
                       return (
                         <div
                           key={elevator.id}
                           className={`bg-white rounded-xl border p-3 transition ${
-                            needsPayment
+                            needsPayment && !paymentCollected
                               ? "border-amber-300 bg-amber-50/40"
                               : isDone
                               ? "border-green-200 bg-green-50/20"
@@ -298,7 +300,6 @@ export default function MaintenancePage() {
                                 </svg>
                               )}
                             </button>
-
                             {/* Info */}
                             <div className="flex-1 min-w-0">
                               <p className={`text-sm font-medium ${isDone ? "text-gray-400 line-through" : "text-gray-900"}`}>
@@ -310,8 +311,15 @@ export default function MaintenancePage() {
                                   ✓ {new Date(record.done_at).toLocaleDateString("el-GR")}
                                 </p>
                               )}
+                              {paymentCollected && record?.payment_collected_at && (
+                                <p className="text-xs text-green-700 mt-0.5">
+                                  € Εισπράχθηκε {new Date(record.payment_collected_at).toLocaleDateString("el-GR")}
+                                </p>
+                              )}
+                              {needsPayment && !paymentCollected && (
+                                <p className="text-xs text-amber-700 mt-0.5">€ Εκκρεμεί είσπραξη</p>
+                              )}
                             </div>
-
                             {/* Notes toggle */}
                             <button
                               onClick={() => toggleNotesExpanded(elevator.id)}
@@ -328,7 +336,6 @@ export default function MaintenancePage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                             </button>
-
                             {/* Needs payment toggle */}
                             <button
                               onClick={() => toggleNeedsPayment(elevator.id, record)}
@@ -344,7 +351,21 @@ export default function MaintenancePage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                             </button>
-
+                            {/* Payment collected confirmation */}
+                            <button
+                              onClick={() => togglePaymentCollected(elevator.id, record)}
+                              disabled={isSavingCollected}
+                              title={paymentCollected ? "Εισπράχθηκε — κλικ για αναίρεση" : "Επιβεβαίωση είσπραξης"}
+                              className={`p-1.5 rounded-lg transition flex-shrink-0 ${
+                                paymentCollected
+                                  ? "text-green-700 bg-green-100"
+                                  : "text-gray-300 hover:text-green-600 hover:bg-green-50"
+                              }`}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
                             {/* Group input */}
                             <input
                               type="text"
@@ -353,7 +374,6 @@ export default function MaintenancePage() {
                               placeholder="Μερίδα"
                               className="text-xs w-20 px-2 py-1.5 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-gray-600 flex-shrink-0"
                             />
-
                             {/* Frequency */}
                             <select
                               value={schedule?.frequency_months ?? 1}
@@ -365,7 +385,6 @@ export default function MaintenancePage() {
                               ))}
                             </select>
                           </div>
-
                           {/* Notes textarea */}
                           {notesOpen && (
                             <div className="mt-3 pl-9">
@@ -387,7 +406,6 @@ export default function MaintenancePage() {
             })}
           </div>
         )}
-
         {/* Non-due elevators */}
         {rows.filter((r) => !r.isDue).length > 0 && (
           <details className="mt-6">
