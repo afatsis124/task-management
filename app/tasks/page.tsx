@@ -1,23 +1,21 @@
 "use client";
-
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AppLayout from "@/components/AppLayout";
+import SearchableSelect from "@/components/SearchableSelect";
+import { matchesSearch } from "@/lib/search";
 import type { Task, Elevator, UserProfile, TaskPriority, TaskStatus } from "@/lib/types";
-
 const priorityConfig = {
   sos: { label: "SOS", bg: "bg-red-100", text: "text-red-700", dot: "bg-red-500", ring: "ring-red-200" },
   urgent: { label: "Επείγον", bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500", ring: "ring-amber-200" },
   normal: { label: "Κανονικό", bg: "bg-blue-100", text: "text-blue-700", dot: "bg-blue-500", ring: "ring-blue-200" },
 };
-
 const statusConfig = {
   pending: { label: "Εκκρεμεί", bg: "bg-amber-100", text: "text-amber-700" },
   in_progress: { label: "Σε εξέλιξη", bg: "bg-blue-100", text: "text-blue-700" },
   completed: { label: "Ολοκληρώθηκε", bg: "bg-green-100", text: "text-green-700" },
   cancelled: { label: "Ακυρώθηκε", bg: "bg-gray-100", text: "text-gray-500" },
 };
-
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [elevators, setElevators] = useState<Elevator[]>([]);
@@ -26,12 +24,10 @@ export default function TasksPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [saving, setSaving] = useState(false);
-
   // Filters
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
-
   // Form
   const [form, setForm] = useState({
     elevator_id: "",
@@ -44,7 +40,11 @@ export default function TasksPage() {
     notify_sms: false,
     notify_email: false,
   });
-
+  // Options for the searchable elevator dropdown
+  const elevatorOptions = useMemo(
+    () => elevators.map((el) => ({ value: el.id, label: `${el.address} (${el.area})` })),
+    [elevators]
+  );
   const fetchData = useCallback(async () => {
     const [tasksRes, elevatorsRes, usersRes] = await Promise.all([
       supabase
@@ -54,17 +54,14 @@ export default function TasksPage() {
       supabase.from("elevators").select("id, address, area").order("address"),
       supabase.from("profiles").select("id, full_name, role, phone, email"),
     ]);
-
     if (tasksRes.data) setTasks(tasksRes.data as unknown as Task[]);
     if (elevatorsRes.data) setElevators(elevatorsRes.data as Elevator[]);
     if (usersRes.data) setUsers(usersRes.data as UserProfile[]);
     setLoading(false);
   }, []);
-
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
   const resetForm = () => {
     setForm({
       elevator_id: "",
@@ -78,11 +75,9 @@ export default function TasksPage() {
       notify_email: false,
     });
   };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-
     const payload = {
       elevator_id: form.elevator_id,
       assigned_to: form.assigned_to || null,
@@ -93,13 +88,11 @@ export default function TasksPage() {
       due_date: form.due_date || null,
       completed_at: form.status === "completed" ? new Date().toISOString() : null,
     };
-
     if (editing) {
       await supabase.from("tasks").update(payload).eq("id", editing.id);
     } else {
       await supabase.from("tasks").insert(payload);
     }
-
     if (form.assigned_to && (form.notify_sms || form.notify_email)) {
       const assignee = users.find((u) => u.id === form.assigned_to);
       const elevator = elevators.find((e) => e.id === form.elevator_id);
@@ -136,14 +129,12 @@ export default function TasksPage() {
         }
       }
     }
-
     setShowForm(false);
     setEditing(null);
     resetForm();
     setSaving(false);
     fetchData();
   };
-
   const openEdit = (task: Task) => {
     setEditing(task);
     setForm({
@@ -159,13 +150,11 @@ export default function TasksPage() {
     });
     setShowForm(true);
   };
-
   const deleteTask = async (taskId: string) => {
     if (!confirm("Διαγραφή εργασίας;")) return;
     await supabase.from("tasks").delete().eq("id", taskId);
     fetchData();
   };
-
   const updateStatus = async (task: Task, newStatus: TaskStatus) => {
     const update: Record<string, unknown> = { status: newStatus };
     if (newStatus === "completed") update.completed_at = new Date().toISOString();
@@ -173,18 +162,15 @@ export default function TasksPage() {
     await supabase.from("tasks").update(update).eq("id", task.id);
     fetchData();
   };
-
   const filtered = tasks.filter((t) => {
     if (filterPriority !== "all" && t.priority !== filterPriority) return false;
     if (filterStatus !== "all" && t.status !== filterStatus) return false;
     if (search) {
-      const s = search.toLowerCase();
       const addr = (t.elevator as unknown as { address: string })?.address || "";
-      return t.title.toLowerCase().includes(s) || addr.toLowerCase().includes(s);
+      return matchesSearch(search, t.title, addr);
     }
     return true;
   });
-
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto">
@@ -201,7 +187,6 @@ export default function TasksPage() {
             + Νέα Εργασία
           </button>
         </div>
-
         {/* Filters */}
         <div className="flex flex-col sm:flex-row flex-wrap gap-3 mb-4">
           <input
@@ -233,7 +218,6 @@ export default function TasksPage() {
             <option value="cancelled">Ακυρώθηκε</option>
           </select>
         </div>
-
         {/* Form Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -252,24 +236,18 @@ export default function TasksPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ασανσέρ *</label>
-                  <select
+                  <SearchableSelect
                     required
+                    options={elevatorOptions}
                     value={form.elevator_id}
-                    onChange={(e) => setForm({ ...form, elevator_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value="">Επέλεξε ασανσέρ</option>
-                    {elevators.map((el) => (
-                      <option key={el.id} value={el.id}>
-                        {el.address} ({el.area})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setForm({ ...form, elevator_id: v })}
+                    placeholder="Επέλεξε ασανσέρ"
+                    searchPlaceholder="Αναζήτηση διεύθυνσης ή περιοχής..."
+                    emptyMessage="Δεν βρέθηκαν ασανσέρ"
+                  />
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Προτεραιότητα</label>
@@ -307,7 +285,6 @@ export default function TasksPage() {
                     </select>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Ανάθεση σε</label>
@@ -334,7 +311,6 @@ export default function TasksPage() {
                     />
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Περιγραφή</label>
                   <textarea
@@ -344,7 +320,6 @@ export default function TasksPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
-
                 <div className="border-t border-gray-100 pt-3">
                   <p className="text-sm font-medium text-gray-700 mb-2">Ειδοποίηση</p>
                   <div className="flex gap-6">
@@ -371,7 +346,6 @@ export default function TasksPage() {
                     <p className="text-xs text-amber-600 mt-1">Επέλεξε χρήστη για να σταλεί ειδοποίηση.</p>
                   )}
                 </div>
-
                 <div className="flex justify-end gap-3 pt-2">
                   <button
                     type="button"
@@ -392,7 +366,6 @@ export default function TasksPage() {
             </div>
           </div>
         )}
-
         {/* Tasks List */}
         {loading ? (
           <div className="flex justify-center py-20">
@@ -408,7 +381,6 @@ export default function TasksPage() {
               const elevator = task.elevator as unknown as { address: string; area: string } | null;
               const assignee = task.assigned_user as unknown as { full_name: string } | null;
               const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== "completed" && task.status !== "cancelled";
-
               return (
                 <div
                   key={task.id}
@@ -435,7 +407,6 @@ export default function TasksPage() {
                         </div>
                       )}
                     </div>
-
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className={`text-sm font-medium ${task.status === "completed" ? "text-gray-400 line-through" : "text-gray-900"}`}>
@@ -466,7 +437,6 @@ export default function TasksPage() {
                         </span>
                       </div>
                     </div>
-
                     {/* Inline on desktop */}
                     <span className={`hidden sm:inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${priority.bg} ${priority.text}`}>
                       {priority.label}
@@ -479,7 +449,6 @@ export default function TasksPage() {
                         {assignee.full_name}
                       </span>
                     )}
-
                     <button
                       onClick={() => openEdit(task)}
                       className="text-gray-400 hover:text-blue-600 transition flex-shrink-0"
