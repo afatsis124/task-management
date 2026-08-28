@@ -1,17 +1,15 @@
 "use client";
-
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AppLayout from "@/components/AppLayout";
 import type { Elevator } from "@/lib/types";
 import Link from "next/link";
-
+import { matchesSearch } from "@/lib/search";
 const statusLabels: Record<string, { label: string; color: string }> = {
   active: { label: "Ενεργό", color: "bg-green-100 text-green-700" },
   inactive: { label: "Ανενεργό", color: "bg-gray-100 text-gray-600" },
   maintenance: { label: "Συντήρηση", color: "bg-amber-100 text-amber-700" },
 };
-
 export default function ElevatorsPage() {
   const [elevators, setElevators] = useState<Elevator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +18,6 @@ export default function ElevatorsPage() {
   const [editing, setEditing] = useState<Elevator | null>(null);
   const [form, setForm] = useState(getEmptyForm());
   const [saving, setSaving] = useState(false);
-
   function getEmptyForm() {
     return {
       type: "residential" as "residential" | "professional",
@@ -45,7 +42,6 @@ export default function ElevatorsPage() {
       afm: "",
     };
   }
-
   const fetchElevators = useCallback(async () => {
     const { data } = await supabase
       .from("elevators")
@@ -54,15 +50,12 @@ export default function ElevatorsPage() {
     if (data) setElevators(data as Elevator[]);
     setLoading(false);
   }, []);
-
   useEffect(() => {
     fetchElevators();
   }, [fetchElevators]);
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-
     const payload = {
       type: form.type,
       address: form.address,
@@ -85,20 +78,17 @@ export default function ElevatorsPage() {
       office_hours: form.office_hours || null,
       afm: form.afm || null,
     };
-
     if (editing) {
       await supabase.from("elevators").update(payload).eq("id", editing.id);
     } else {
       await supabase.from("elevators").insert(payload);
     }
-
     setShowForm(false);
     setEditing(null);
     setForm(getEmptyForm());
     setSaving(false);
     fetchElevators();
   };
-
   const openEdit = (elevator: Elevator) => {
     setEditing(elevator);
     setForm({
@@ -125,20 +115,20 @@ export default function ElevatorsPage() {
     });
     setShowForm(true);
   };
-
   const deleteElevator = async (elevatorId: string) => {
     if (!confirm("Διαγραφή ασανσέρ; Θα διαγραφούν και όλες οι σχετικές εργασίες.")) return;
     await supabase.from("elevators").delete().eq("id", elevatorId);
     fetchElevators();
   };
-
-  const filtered = elevators.filter(
-    (e) =>
-      e.address.toLowerCase().includes(search.toLowerCase()) ||
-      e.contact_name.toLowerCase().includes(search.toLowerCase()) ||
-      e.area.toLowerCase().includes(search.toLowerCase())
-  );
-
+  // Accent-insensitive search: typing "αγι" finds "Αγίου Πέτρου".
+  // Rows matching on address/area are listed before rows that only match a contact name.
+  const filtered = elevators
+    .filter((e) => matchesSearch(search, e.address, e.contact_name, e.area))
+    .sort((a, b) => {
+      const aRank = matchesSearch(search, a.address, a.area) ? 0 : 1;
+      const bRank = matchesSearch(search, b.address, b.area) ? 0 : 1;
+      return aRank - bRank;
+    });
   return (
     <AppLayout>
       <div className="max-w-7xl mx-auto">
@@ -155,7 +145,6 @@ export default function ElevatorsPage() {
             + Νέο Ασανσέρ
           </button>
         </div>
-
         {/* Search */}
         <div className="mb-4">
           <input
@@ -166,7 +155,6 @@ export default function ElevatorsPage() {
             className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           />
         </div>
-
         {/* Form Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -192,7 +180,6 @@ export default function ElevatorsPage() {
                     </button>
                   ))}
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Διεύθυνση *" value={form.address} onChange={(v) => setForm({ ...form, address: v })} required />
                   <FormField label="Περιοχή" value={form.area} onChange={(v) => setForm({ ...form, area: v })} />
@@ -223,7 +210,6 @@ export default function ElevatorsPage() {
                     <FormField label="ΑΦΜ" value={form.afm} onChange={(v) => setForm({ ...form, afm: v })} />
                   )}
                 </div>
-
                 {form.type === "residential" && (
                   <div className="border-t border-gray-200 pt-4">
                     <p className="text-sm font-semibold text-gray-700 mb-3">Γραφείο Κοινοχρήστων</p>
@@ -238,7 +224,6 @@ export default function ElevatorsPage() {
                     </div>
                   </div>
                 )}
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Σημειώσεις</label>
                   <textarea
@@ -268,7 +253,6 @@ export default function ElevatorsPage() {
             </div>
           </div>
         )}
-
         {/* Table */}
         {loading ? (
           <div className="flex justify-center py-20">
@@ -300,7 +284,6 @@ export default function ElevatorsPage() {
                   const isExpiringSoon =
                     certExpiry && certExpiry.getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000 && certExpiry.getTime() > Date.now();
                   const isExpired = certExpiry && certExpiry.getTime() < Date.now();
-
                   return (
                     <tr key={elevator.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
@@ -360,7 +343,6 @@ export default function ElevatorsPage() {
     </AppLayout>
   );
 }
-
 function FormField({
   label,
   value,
