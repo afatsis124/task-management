@@ -19,6 +19,8 @@ interface MaintenanceRecord {
   // Set when the money was actually collected; null means still outstanding.
   payment_collected_at: string | null;
   notes: string | null;
+  // Separate note shown only while this month's visit is flagged πληρωτέο.
+  payment_notes: string | null;
 }
 interface ElevatorRow {
   elevator: Elevator;
@@ -39,15 +41,24 @@ export default function MaintenancePage() {
   const [elevators, setElevators] = useState<Elevator[]>([]);
   const [schedules, setSchedules] = useState<MaintenanceSchedule[]>([]);
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
+  // Last month's records, used to carry notes forward.
+  const [prevRecords, setPrevRecords] = useState<MaintenanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
+  // What the user is currently typing, keyed by elevator+month, so the
+  // textareas stay responsive while the debounced save is in flight.
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [paymentNoteDrafts, setPaymentNoteDrafts] = useState<Record<string, string>>({});
   const notesRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const paymentNotesRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+  const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
   const fetchData = useCallback(async () => {
-    const [elevatorsRes, schedulesRes, recordsRes] = await Promise.all([
+    const [elevatorsRes, schedulesRes, recordsRes, prevRecordsRes] = await Promise.all([
       supabase.from("elevators").select("*").eq("status", "active").order("address"),
       supabase.from("maintenance_schedules").select("*"),
       supabase
@@ -55,21 +66,46 @@ export default function MaintenancePage() {
         .select("*")
         .eq("month", selectedMonth)
         .eq("year", selectedYear),
+      supabase
+        .from("maintenance_records")
+        .select("*")
+        .eq("month", prevMonth)
+        .eq("year", prevYear),
     ]);
     if (elevatorsRes.data) setElevators(elevatorsRes.data as Elevator[]);
     if (schedulesRes.data) setSchedules(schedulesRes.data as MaintenanceSchedule[]);
     if (recordsRes.data) setRecords(recordsRes.data as MaintenanceRecord[]);
+    setPrevRecords((prevRecordsRes.data as MaintenanceRecord[]) ?? []);
     setLoading(false);
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, prevMonth, prevYear]);
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+  // Clear any in-progress typing when the month changes, so drafts never leak
+  // from one month into another.
+  useEffect(() => {
+    setNoteDrafts({});
+    setPaymentNoteDrafts({});
+  }, [selectedMonth, selectedYear]);
+  // Last month's note for this elevator, or null. This is what gets carried
+  // forward into a newly created record.
+  const previousNoteFor = (elevatorId: string): string | null => {
+    const prev = prevRecords.find((r) => r.elevator_id === elevatorId);
+    const note = prev?.notes?.trim();
+    return note ? note : null;
+  };
   const getOrCreateRecord = async (elevatorId: string): Promise<MaintenanceRecord> => {
     const existing = records.find((r) => r.elevator_id === elevatorId);
     if (existing) return existing;
     const { data } = await supabase
       .from("maintenance_records")
-      .insert({ elevator_id: elevatorId, month: selectedMonth, year: selectedYear, needs_payment: false })
+      .insert({
+        elevator_id: elevatorId,
+        month: selectedMonth,
+        year: selectedYear,
+        needs_payment: false,
+        notes: previousNoteFor(elevatorId),
+      })
       .select()
       .single();
     return data as MaintenanceRecord;
@@ -107,6 +143,7 @@ export default function MaintenancePage() {
         year: selectedYear,
         done_at: new Date().toISOString().split("T")[0],
         needs_payment: false,
+        notes: previousNoteFor(elevatorId),
       });
     }
     await fetchData();
@@ -138,15 +175,39 @@ export default function MaintenancePage() {
   const saveNotes = async (elevatorId: string, notes: string, currentRecord: MaintenanceRecord | null) => {
     let rec = currentRecord;
     if (!rec) rec = await getOrCreateRecord(elevatorId);
-    await supabase.from("maintenance_records").update({ notes: notes || null }).eq("id", rec.id);
+    // Stored as "" (not null) when cleared, so an empty note is remembered as a
+    // deliberate choice and last month's note is not pulled back in.
+    await supabase.from("maintenance_records").update({ notes }).eq("id", rec.id);
     await fetchData();
   };
-  const handleNotesChange = (elevatorId: string, value: string, record: MaintenanceRecord | null) => {
-    setRecords((prev) =>
-      prev.map((r) => (r.elevator_id === elevatorId ? { ...r, notes: value } : r))
+  const savePaymentNotes = async (elevatorId: string, notes: string, currentRecord: MaintenanceRecord | null) => {
+    let rec = currentRecord;
+    if (!rec) rec = await getOrCreateRecord(elevatorId);
+    await supabase.from("maintenance_records").update({ payment_notes: notes || null }).eq("id", rec.id);
+    await fetchData();
+  };
+  const handleNotesChange = (
+    elevatorId: string,
+    draftKey: string,
+    value: string,
+    record: MaintenanceRecord | null
+  ) => {
+    setNoteDrafts((prev) => ({ ...prev, [draftKey]: value }));
+    if (notesRefs.current[draftKey]) clearTimeout(notesRefs.current[draftKey]);
+    notesRefs.current[draftKey] = setTimeout(() => saveNotes(elevatorId, value, record), 800);
+  };
+  const handlePaymentNotesChange = (
+    elevatorId: string,
+    draftKey: string,
+    value: string,
+    record: MaintenanceRecord | null
+  ) => {
+    setPaymentNoteDrafts((prev) => ({ ...prev, [draftKey]: value }));
+    if (paymentNotesRefs.current[draftKey]) clearTimeout(paymentNotesRefs.current[draftKey]);
+    paymentNotesRefs.current[draftKey] = setTimeout(
+      () => savePaymentNotes(elevatorId, value, record),
+      800
     );
-    if (notesRefs.current[elevatorId]) clearTimeout(notesRefs.current[elevatorId]);
-    notesRefs.current[elevatorId] = setTimeout(() => saveNotes(elevatorId, value, record), 800);
   };
   const toggleNotesExpanded = (elevatorId: string) => {
     setExpandedNotes((prev) => {
@@ -271,7 +332,20 @@ export default function MaintenancePage() {
                       const isSavingPay = saving === elevator.id + "_pay";
                       const isSavingCollected = saving === elevator.id + "_collected";
                       const notesOpen = expandedNotes.has(elevator.id);
-                      const notesValue = record?.notes ?? "";
+                      const draftKey = `${elevator.id}_${selectedMonth}_${selectedYear}`;
+                      // A record can exist for other reasons (done, πληρωτέο) and still
+                      // have no note. Carry last month's note forward whenever this
+                      // month has no note of its own. An empty string means the note
+                      // was deliberately cleared here, so nothing is inherited.
+                      const ownNote = record?.notes;
+                      const hasOwnNote = ownNote !== null && ownNote !== undefined;
+                      const inheritedNote = hasOwnNote ? null : previousNoteFor(elevator.id);
+                      const notesValue =
+                        noteDrafts[draftKey] ?? (hasOwnNote ? ownNote : inheritedNote ?? "");
+                      const showsInherited =
+                        noteDrafts[draftKey] === undefined && !hasOwnNote && !!inheritedNote;
+                      const paymentNotesValue =
+                        paymentNoteDrafts[draftKey] ?? record?.payment_notes ?? "";
                       return (
                         <div
                           key={elevator.id}
@@ -385,12 +459,36 @@ export default function MaintenancePage() {
                               ))}
                             </select>
                           </div>
+                          {/* Payment notes — only while this visit is flagged πληρωτέο */}
+                          {needsPayment && (
+                            <div className="mt-3 pl-9">
+                              <label className="block text-xs font-medium text-amber-800 mb-1">
+                                Σημειώσεις πληρωμής
+                              </label>
+                              <textarea
+                                value={paymentNotesValue}
+                                onChange={(e) =>
+                                  handlePaymentNotesChange(elevator.id, draftKey, e.target.value, record)
+                                }
+                                rows={2}
+                                placeholder="π.χ. δεν ήταν ο διαχειριστής, θα πληρώσει τον επόμενο μήνα"
+                                className="w-full px-3 py-2 text-sm bg-amber-50/60 border border-amber-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                              />
+                            </div>
+                          )}
                           {/* Notes textarea */}
                           {notesOpen && (
                             <div className="mt-3 pl-9">
+                              {showsInherited && (
+                                <p className="text-xs text-gray-400 mb-1">
+                                  Μεταφέρθηκε από τον προηγούμενο μήνα
+                                </p>
+                              )}
                               <textarea
                                 value={notesValue}
-                                onChange={(e) => handleNotesChange(elevator.id, e.target.value, record)}
+                                onChange={(e) =>
+                                  handleNotesChange(elevator.id, draftKey, e.target.value, record)
+                                }
                                 rows={2}
                                 placeholder="Σημειώσεις (επισκευές, πληρωμές διαχειριστή, κτλ.)"
                                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 resize-none"
