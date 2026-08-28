@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AppLayout from "@/components/AppLayout";
 import SearchableSelect from "@/components/SearchableSelect";
+import { matchesSearch } from "@/lib/search";
 import type { Task, Elevator, UserProfile, TaskPriority, TaskStatus } from "@/lib/types";
 const priorityConfig = {
   sos: { label: "SOS", bg: "bg-red-100", text: "text-red-700", dot: "bg-red-500", ring: "ring-red-200" },
@@ -165,9 +166,8 @@ export default function TasksPage() {
     if (filterPriority !== "all" && t.priority !== filterPriority) return false;
     if (filterStatus !== "all" && t.status !== filterStatus) return false;
     if (search) {
-      const s = search.toLowerCase();
       const addr = (t.elevator as unknown as { address: string })?.address || "";
-      return t.title.toLowerCase().includes(s) || addr.toLowerCase().includes(s);
+      return matchesSearch(search, t.title, addr);
     }
     return true;
   });
