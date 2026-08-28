@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import type { Elevator } from "@/lib/types";
 import Link from "next/link";
 import { matchesSearch } from "@/lib/search";
+import PhoneLink from "@/components/PhoneLink";
 const statusLabels: Record<string, { label: string; color: string }> = {
   active: { label: "Ενεργό", color: "bg-green-100 text-green-700" },
   inactive: { label: "Ανενεργό", color: "bg-gray-100 text-gray-600" },
@@ -298,7 +299,9 @@ export default function ElevatorsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">{elevator.contact_name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{elevator.contact_phone}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        <PhoneLink value={elevator.contact_phone} className="text-gray-600" />
+                      </td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">€{elevator.monthly_fee}</td>
                       <td className="px-6 py-4">
                         {certExpiry ? (
