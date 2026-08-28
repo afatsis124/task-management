@@ -1,35 +1,30 @@
 "use client";
-
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AppLayout from "@/components/AppLayout";
+import PhoneLink from "@/components/PhoneLink";
 import type { UserProfile } from "@/lib/types";
-
 export default function TeamPage() {
   const [members, setMembers] = useState<(UserProfile & { task_count?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingRole, setEditingRole] = useState<string | null>(null);
-
   const fetchTeam = useCallback(async () => {
     const { data: profiles } = await supabase
       .from("profiles")
       .select("*")
       .order("full_name");
-
     if (profiles) {
       // Get task counts per user
       const { data: taskCounts } = await supabase
         .from("tasks")
         .select("assigned_to")
         .in("status", ["pending", "in_progress"]);
-
       const countMap: Record<string, number> = {};
       taskCounts?.forEach((t) => {
         if (t.assigned_to) {
           countMap[t.assigned_to] = (countMap[t.assigned_to] || 0) + 1;
         }
       });
-
       setMembers(
         (profiles as UserProfile[]).map((p) => ({
           ...p,
@@ -39,22 +34,18 @@ export default function TeamPage() {
     }
     setLoading(false);
   }, []);
-
   useEffect(() => {
     fetchTeam();
   }, [fetchTeam]);
-
   const updateRole = async (userId: string, newRole: "admin" | "technician") => {
     await supabase.from("profiles").update({ role: newRole }).eq("id", userId);
     setEditingRole(null);
     fetchTeam();
   };
-
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Ομάδα</h1>
-
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -114,7 +105,9 @@ export default function TeamPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{member.phone || "—"}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      <PhoneLink value={member.phone} className="text-gray-600" />
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`text-sm font-medium ${
                         (member.task_count || 0) > 5 ? "text-red-600" :
