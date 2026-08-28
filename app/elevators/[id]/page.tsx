@@ -1,39 +1,32 @@
 "use client";
-
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AppLayout from "@/components/AppLayout";
+import PhoneLink from "@/components/PhoneLink";
 import type { Elevator, Task, RepairRecord, SparePart, RepairDocument, Payment } from "@/lib/types";
 import Link from "next/link";
-
 const priorityConfig = {
   sos: { label: "SOS", bg: "bg-red-100", text: "text-red-700" },
   urgent: { label: "Επείγον", bg: "bg-amber-100", text: "text-amber-700" },
   normal: { label: "Κανονικό", bg: "bg-blue-100", text: "text-blue-700" },
 };
-
 const statusConfig = {
   pending: { label: "Εκκρεμεί", bg: "bg-amber-100", text: "text-amber-700" },
   in_progress: { label: "Σε εξέλιξη", bg: "bg-blue-100", text: "text-blue-700" },
   completed: { label: "Ολοκληρώθηκε", bg: "bg-green-100", text: "text-green-700" },
   cancelled: { label: "Ακυρώθηκε", bg: "bg-gray-100", text: "text-gray-500" },
 };
-
 const repairStatusConfig = {
   pending: { label: "Εκκρεμεί", bg: "bg-amber-100", text: "text-amber-700" },
   in_progress: { label: "Σε εξέλιξη", bg: "bg-blue-100", text: "text-blue-700" },
   completed: { label: "Ολοκληρώθηκε", bg: "bg-green-100", text: "text-green-700" },
 };
-
 const GREEK_MONTHS = ["", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος", "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος"];
-
 type Tab = "info" | "tasks" | "repairs" | "spare_parts" | "repair_docs" | "payments";
-
 export default function ElevatorDetailPage() {
   const params = useParams();
   const id = params.id as string;
-
   const [elevator, setElevator] = useState<Elevator | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [repairs, setRepairs] = useState<RepairRecord[]>([]);
@@ -42,26 +35,22 @@ export default function ElevatorDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [tab, setTab] = useState<Tab>("info");
   const [loading, setLoading] = useState(true);
-
   // Spare part form
   const [showSpareForm, setShowSpareForm] = useState(false);
   const [editingSpart, setEditingSpart] = useState<SparePart | null>(null);
   const [spareForm, setSpareForm] = useState(emptySpareForm());
   const [savingSpart, setSavingSpart] = useState(false);
-
   // Repair doc form
   const [showRepairDocForm, setShowRepairDocForm] = useState(false);
   const [editingRepairDoc, setEditingRepairDoc] = useState<RepairDocument | null>(null);
   const [repairDocForm, setRepairDocForm] = useState(emptyRepairDocForm());
   const [savingRepairDoc, setSavingRepairDoc] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
-
   // Payment form
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm());
   const [savingPayment, setSavingPayment] = useState(false);
-
   function emptySpareForm() {
     return {
       installation_date: "",
@@ -75,11 +64,9 @@ export default function ElevatorDetailPage() {
       payment_date: "",
     };
   }
-
   function emptyRepairDocForm() {
     return { title: "", description: "", status: "pending" as "pending" | "in_progress" | "completed", pdf_url: "" };
   }
-
   function emptyPaymentForm() {
     const now = new Date();
     return {
@@ -90,7 +77,6 @@ export default function ElevatorDetailPage() {
       payment_date: "",
     };
   }
-
   const fetchData = useCallback(async () => {
     const [elevatorRes, tasksRes, repairsRes, spareRes, repairDocRes, paymentRes] = await Promise.all([
       supabase.from("elevators").select("*").eq("id", id).single(),
@@ -100,7 +86,6 @@ export default function ElevatorDetailPage() {
       supabase.from("repair_documents").select("*").eq("elevator_id", id).order("created_at", { ascending: false }),
       supabase.from("payments").select("*").eq("elevator_id", id).order("year", { ascending: false }).order("month", { ascending: false }),
     ]);
-
     if (elevatorRes.data) setElevator(elevatorRes.data as Elevator);
     if (tasksRes.data) setTasks(tasksRes.data as unknown as Task[]);
     if (repairsRes.data) setRepairs(repairsRes.data as unknown as RepairRecord[]);
@@ -109,9 +94,7 @@ export default function ElevatorDetailPage() {
     if (paymentRes.data) setPayments(paymentRes.data as Payment[]);
     setLoading(false);
   }, [id]);
-
   useEffect(() => { fetchData(); }, [fetchData]);
-
   // ── Spare parts CRUD ──
   const handleSaveSpart = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,7 +122,6 @@ export default function ElevatorDetailPage() {
     setSavingSpart(false);
     fetchData();
   };
-
   const openEditSpart = (s: SparePart) => {
     setEditingSpart(s);
     setSpareForm({
@@ -155,13 +137,11 @@ export default function ElevatorDetailPage() {
     });
     setShowSpareForm(true);
   };
-
   const deleteSpart = async (partId: string) => {
     if (!confirm("Διαγραφή ανταλλακτικού;")) return;
     await supabase.from("spare_parts").delete().eq("id", partId);
     fetchData();
   };
-
   // ── Repair docs CRUD ──
   const handlePdfUpload = async (file: File): Promise<string | null> => {
     setUploadingPdf(true);
@@ -172,7 +152,6 @@ export default function ElevatorDetailPage() {
     const { data } = supabase.storage.from("repair-pdfs").getPublicUrl(path);
     return data.publicUrl;
   };
-
   const handleSaveRepairDoc = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingRepairDoc(true);
@@ -194,19 +173,16 @@ export default function ElevatorDetailPage() {
     setSavingRepairDoc(false);
     fetchData();
   };
-
   const openEditRepairDoc = (r: RepairDocument) => {
     setEditingRepairDoc(r);
     setRepairDocForm({ title: r.title, description: r.description ?? "", status: r.status, pdf_url: r.pdf_url ?? "" });
     setShowRepairDocForm(true);
   };
-
   const deleteRepairDoc = async (docId: string) => {
     if (!confirm("Διαγραφή επισκευής;")) return;
     await supabase.from("repair_documents").delete().eq("id", docId);
     fetchData();
   };
-
   // ── Payments CRUD ──
   const handleSavePayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,7 +206,6 @@ export default function ElevatorDetailPage() {
     setSavingPayment(false);
     fetchData();
   };
-
   const openEditPayment = (p: Payment) => {
     setEditingPayment(p);
     setPaymentForm({
@@ -242,13 +217,11 @@ export default function ElevatorDetailPage() {
     });
     setShowPaymentForm(true);
   };
-
   const deletePayment = async (payId: string) => {
     if (!confirm("Διαγραφή πληρωμής;")) return;
     await supabase.from("payments").delete().eq("id", payId);
     fetchData();
   };
-
   if (loading) {
     return (
       <AppLayout>
@@ -258,7 +231,6 @@ export default function ElevatorDetailPage() {
       </AppLayout>
     );
   }
-
   if (!elevator) {
     return (
       <AppLayout>
@@ -266,13 +238,11 @@ export default function ElevatorDetailPage() {
       </AppLayout>
     );
   }
-
   const certExpiry = elevator.certification_expiry ? new Date(elevator.certification_expiry) : null;
   const isExpired = certExpiry && certExpiry.getTime() < Date.now();
   const isExpiringSoon = certExpiry && !isExpired && certExpiry.getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
   const pendingTasks = tasks.filter((t) => t.status === "pending" || t.status === "in_progress").length;
   const completedTasks = tasks.filter((t) => t.status === "completed").length;
-
   return (
     <AppLayout>
       <div className="max-w-5xl mx-auto">
@@ -282,7 +252,6 @@ export default function ElevatorDetailPage() {
           <span>/</span>
           <span className="text-gray-900">{elevator.address}</span>
         </div>
-
         {/* Header Card */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -303,7 +272,7 @@ export default function ElevatorDetailPage() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
             <InfoItem label="Επαφή" value={elevator.contact_name} />
-            <InfoItem label="Τηλέφωνο" value={elevator.contact_phone} />
+            <InfoItem label="Τηλέφωνο" value={elevator.contact_phone} phone />
             <InfoItem label="Email" value={elevator.contact_email || "—"} />
             <InfoItem label="Όροφοι" value={elevator.floors.toString()} />
             <InfoItem label="Τελευταία Πιστοποίηση" value={elevator.certification_date ? new Date(elevator.certification_date).toLocaleDateString("el-GR") : "—"} />
@@ -317,7 +286,6 @@ export default function ElevatorDetailPage() {
             </div>
           )}
         </div>
-
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4 overflow-x-auto">
           {([
@@ -339,7 +307,6 @@ export default function ElevatorDetailPage() {
             </button>
           ))}
         </div>
-
         {/* ── INFO TAB ── */}
         {tab === "info" && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
@@ -354,22 +321,20 @@ export default function ElevatorDetailPage() {
                 {elevator.protocol_number && <InfoBlock label="Αρ. Πρωτοκόλλου" value={elevator.protocol_number} />}
               </div>
             </div>
-
             <div>
               <h3 className="font-semibold text-gray-900 mb-3">Επαφή</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <InfoBlock label="Όνομα" value={elevator.contact_name} />
-                <InfoBlock label="Τηλέφωνο" value={elevator.contact_phone} />
+                <InfoBlock label="Τηλέφωνο" value={elevator.contact_phone} phone />
                 {elevator.contact_email && <InfoBlock label="Email" value={elevator.contact_email} />}
               </div>
             </div>
-
             {(elevator.office_name || elevator.office_phone || elevator.office_address) && (
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">Γραφείο Κοινοχρήστων</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   {elevator.office_name && <InfoBlock label="Όνομα" value={elevator.office_name} />}
-                  {elevator.office_phone && <InfoBlock label="Τηλέφωνο" value={elevator.office_phone} />}
+                  {elevator.office_phone && <InfoBlock label="Τηλέφωνο" value={elevator.office_phone} phone />}
                   {elevator.office_address && <InfoBlock label="Διεύθυνση" value={elevator.office_address} />}
                   {elevator.office_email && <InfoBlock label="Email" value={elevator.office_email} />}
                   {elevator.office_hours && <InfoBlock label="Ωράριο" value={elevator.office_hours} />}
@@ -378,7 +343,6 @@ export default function ElevatorDetailPage() {
             )}
           </div>
         )}
-
         {/* ── TASKS TAB ── */}
         {tab === "tasks" && (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -409,7 +373,6 @@ export default function ElevatorDetailPage() {
             )}
           </div>
         )}
-
         {/* ── REPAIR HISTORY TAB ── */}
         {tab === "repairs" && (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -434,7 +397,6 @@ export default function ElevatorDetailPage() {
             )}
           </div>
         )}
-
         {/* ── SPARE PARTS TAB ── */}
         {tab === "spare_parts" && (
           <div>
@@ -443,7 +405,6 @@ export default function ElevatorDetailPage() {
                 + Νέο Ανταλλακτικό
               </button>
             </div>
-
             {showSpareForm && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
@@ -501,7 +462,6 @@ export default function ElevatorDetailPage() {
                 </div>
               </div>
             )}
-
             {spareParts.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-500">Δεν υπάρχουν ανταλλακτικά</div>
             ) : (
@@ -537,7 +497,6 @@ export default function ElevatorDetailPage() {
             )}
           </div>
         )}
-
         {/* ── REPAIR DOCS TAB ── */}
         {tab === "repair_docs" && (
           <div>
@@ -546,7 +505,6 @@ export default function ElevatorDetailPage() {
                 + Νέα Επισκευή
               </button>
             </div>
-
             {showRepairDocForm && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
@@ -596,7 +554,6 @@ export default function ElevatorDetailPage() {
                 </div>
               </div>
             )}
-
             {repairDocs.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-500">Δεν υπάρχουν επισκευές</div>
             ) : (
@@ -632,7 +589,6 @@ export default function ElevatorDetailPage() {
             )}
           </div>
         )}
-
         {/* ── PAYMENTS TAB ── */}
         {tab === "payments" && (
           <div>
@@ -641,7 +597,6 @@ export default function ElevatorDetailPage() {
                 + Νέα Πληρωμή
               </button>
             </div>
-
             {showPaymentForm && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
@@ -683,7 +638,6 @@ export default function ElevatorDetailPage() {
                 </div>
               </div>
             )}
-
             {payments.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-500">Δεν υπάρχουν πληρωμές</div>
             ) : (
@@ -720,23 +674,21 @@ export default function ElevatorDetailPage() {
     </AppLayout>
   );
 }
-
-function InfoItem({ label, value, highlight }: { label: string; value: string; highlight?: "red" | "amber" }) {
+function InfoItem({ label, value, highlight, phone }: { label: string; value: string; highlight?: "red" | "amber"; phone?: boolean }) {
   return (
     <div>
       <p className="text-xs text-gray-500">{label}</p>
       <p className={`text-sm font-medium ${highlight === "red" ? "text-red-600" : highlight === "amber" ? "text-amber-600" : "text-gray-900"}`}>
-        {value}
+        {phone ? <PhoneLink value={value} /> : value}
       </p>
     </div>
   );
 }
-
-function InfoBlock({ label, value }: { label: string; value: string }) {
+function InfoBlock({ label, value, phone }: { label: string; value: string; phone?: boolean }) {
   return (
     <div>
       <p className="text-gray-500 text-xs">{label}</p>
-      <p className="font-medium text-gray-900 text-sm">{value}</p>
+      <p className="font-medium text-gray-900 text-sm">{phone ? <PhoneLink value={value} /> : value}</p>
     </div>
   );
 }
