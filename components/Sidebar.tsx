@@ -1,12 +1,10 @@
 "use client";
-
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useState } from "react";
 import type { UserProfile } from "@/lib/types";
 import ThemeToggle from "@/components/ThemeToggle";
-
 const navItems = [
   {
     href: "/dashboard",
@@ -63,6 +61,15 @@ const navItems = [
     ),
   },
   {
+    href: "/data-health",
+    label: "Δεδομένα",
+    icon: (
+      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+    ),
+  },
+  {
     href: "/team",
     label: "Ομάδα",
     icon: (
@@ -73,25 +80,20 @@ const navItems = [
     adminOnly: true,
   },
 ];
-
 interface SidebarProps {
   user: UserProfile | null;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
-
 export default function Sidebar({ user, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
-
   const isAdmin = user?.role === "admin";
-
   return (
     <>
       {/* Mobile backdrop */}
@@ -101,7 +103,6 @@ export default function Sidebar({ user, mobileOpen, onMobileClose }: SidebarProp
           onClick={onMobileClose}
         />
       )}
-
       <aside
         className={`
           fixed inset-y-0 left-0 z-50
@@ -144,7 +145,6 @@ export default function Sidebar({ user, mobileOpen, onMobileClose }: SidebarProp
             </svg>
           </button>
         </div>
-
         {/* Nav */}
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {navItems
@@ -169,7 +169,6 @@ export default function Sidebar({ user, mobileOpen, onMobileClose }: SidebarProp
               );
             })}
         </nav>
-
         {/* User */}
         <div className="p-3 border-t border-gray-200">
           {user && (
