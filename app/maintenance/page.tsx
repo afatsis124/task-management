@@ -175,7 +175,9 @@ export default function MaintenancePage() {
   const saveNotes = async (elevatorId: string, notes: string, currentRecord: MaintenanceRecord | null) => {
     let rec = currentRecord;
     if (!rec) rec = await getOrCreateRecord(elevatorId);
-    await supabase.from("maintenance_records").update({ notes: notes || null }).eq("id", rec.id);
+    // Stored as "" (not null) when cleared, so an empty note is remembered as a
+    // deliberate choice and last month's note is not pulled back in.
+    await supabase.from("maintenance_records").update({ notes }).eq("id", rec.id);
     await fetchData();
   };
   const savePaymentNotes = async (elevatorId: string, notes: string, currentRecord: MaintenanceRecord | null) => {
@@ -331,13 +333,17 @@ export default function MaintenancePage() {
                       const isSavingCollected = saving === elevator.id + "_collected";
                       const notesOpen = expandedNotes.has(elevator.id);
                       const draftKey = `${elevator.id}_${selectedMonth}_${selectedYear}`;
-                      // With no record yet for this month, show last month's note
-                      // as the starting text — it gets saved for real on first edit.
-                      const inheritedNote = record ? null : previousNoteFor(elevator.id);
+                      // A record can exist for other reasons (done, πληρωτέο) and still
+                      // have no note. Carry last month's note forward whenever this
+                      // month has no note of its own. An empty string means the note
+                      // was deliberately cleared here, so nothing is inherited.
+                      const ownNote = record?.notes;
+                      const hasOwnNote = ownNote !== null && ownNote !== undefined;
+                      const inheritedNote = hasOwnNote ? null : previousNoteFor(elevator.id);
                       const notesValue =
-                        noteDrafts[draftKey] ?? record?.notes ?? inheritedNote ?? "";
+                        noteDrafts[draftKey] ?? (hasOwnNote ? ownNote : inheritedNote ?? "");
                       const showsInherited =
-                        noteDrafts[draftKey] === undefined && !record && !!inheritedNote;
+                        noteDrafts[draftKey] === undefined && !hasOwnNote && !!inheritedNote;
                       const paymentNotesValue =
                         paymentNoteDrafts[draftKey] ?? record?.payment_notes ?? "";
                       return (
