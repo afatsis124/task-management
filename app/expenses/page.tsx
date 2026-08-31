@@ -52,8 +52,8 @@ function emptyForm() {
   return {
     date: new Date().toISOString().split("T")[0],
     category: "bills" as Category,
-    amount: "",
-    vat: "",
+    gross: "",
+    vatRate: "24",
     description: "",
     supplier: "",
     person: "",
@@ -152,8 +152,11 @@ export default function ExpensesPage() {
     setForm({
       date: e.date,
       category: e.category,
-      amount: String(e.amount ?? ""),
-      vat: String(e.vat ?? ""),
+      gross: String(Number(e.amount ?? 0) + Number(e.vat ?? 0)),
+      vatRate:
+        Number(e.amount) > 0
+          ? String(Math.round((Number(e.vat) / Number(e.amount)) * 10000) / 100)
+          : "24",
       description: e.description ?? "",
       supplier: e.supplier ?? "",
       person: e.person ?? "",
@@ -167,11 +170,17 @@ export default function ExpensesPage() {
     ev.preventDefault();
     setSaving(true);
     const { data: auth } = await supabase.auth.getUser();
+    // The receipt shows the total; net and ΦΠΑ are derived from it so the two
+    // always add back up to exactly what was paid.
+    const gross = parseFloat(form.gross) || 0;
+    const rate = parseFloat(form.vatRate) || 0;
+    const net = Math.round((gross / (1 + rate / 100)) * 100) / 100;
+    const vatAmount = Math.round((gross - net) * 100) / 100;
     const payload = {
       date: form.date,
       category: form.category,
-      amount: parseFloat(form.amount) || 0,
-      vat: parseFloat(form.vat) || 0,
+      amount: net,
+      vat: vatAmount,
       description: form.description || null,
       supplier: form.supplier || null,
       person: form.person || null,
@@ -242,14 +251,10 @@ export default function ExpensesPage() {
     fetchData();
   };
 
-  const applyVat = (rate: number) => {
-    const net = parseFloat(form.amount);
-    if (Number.isNaN(net)) return;
-    setForm({ ...form, vat: ((net * rate) / 100).toFixed(2) });
-  };
-
-  const formNet = parseFloat(form.amount) || 0;
-  const formVat = parseFloat(form.vat) || 0;
+  const formGross = parseFloat(form.gross) || 0;
+  const formRate = parseFloat(form.vatRate) || 0;
+  const formNet = Math.round((formGross / (1 + formRate / 100)) * 100) / 100;
+  const formVat = Math.round((formGross - formNet) * 100) / 100;
 
   const years = [now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
   const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString("el-GR", {
@@ -409,45 +414,62 @@ export default function ExpensesPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Καθαρή αξία (€) *</label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Συνολική αξία (€) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={form.gross}
+                    onChange={(e) => setForm({ ...form, gross: e.target.value })}
+                    placeholder="όπως γράφει το παραστατικό"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ΦΠΑ (%)</label>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {VAT_RATES.map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setForm({ ...form, vatRate: String(r) })}
+                        className={`px-3 py-2 text-xs font-medium rounded-lg border transition ${
+                          parseFloat(form.vatRate) === r
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {r}%
+                      </button>
+                    ))}
+                    <span className="text-xs text-gray-400 px-1">ή</span>
                     <input
                       type="number"
-                      step="0.01"
-                      required
-                      value={form.amount}
-                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      step="0.1"
+                      min="0"
+                      value={form.vatRate}
+                      onChange={(e) => setForm({ ...form, vatRate: e.target.value })}
+                      aria-label="Ποσοστό ΦΠΑ"
+                      className="w-20 px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ΦΠΑ (€)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={form.vat}
-                      onChange={(e) => setForm({ ...form, vat: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                    <div className="flex gap-1.5 mt-1.5">
-                      {VAT_RATES.map((r) => (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => applyVat(r)}
-                          className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition"
-                        >
-                          {r}%
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm">
-                  <span className="text-gray-500">Σύνολο</span>{" "}
-                  <span className="font-bold text-gray-900">€{money(formNet + formVat)}</span>
+                <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-sm flex flex-wrap gap-x-5 gap-y-1">
+                  <span>
+                    <span className="text-gray-500">Καθαρή αξία</span>{" "}
+                    <span className="font-semibold text-gray-900">€{money(formNet)}</span>
+                  </span>
+                  <span>
+                    <span className="text-gray-500">ΦΠΑ</span>{" "}
+                    <span className="font-semibold text-gray-900">€{money(formVat)}</span>
+                  </span>
+                  <span>
+                    <span className="text-gray-500">Σύνολο</span>{" "}
+                    <span className="font-bold text-gray-900">€{money(formGross)}</span>
+                  </span>
                 </div>
 
                 <div>
