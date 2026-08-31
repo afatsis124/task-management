@@ -67,6 +67,7 @@ export default function ElevatorDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [tab, setTab] = useState<Tab>("info");
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<string | null>(null);
   // Spare part form
   const [showSpareForm, setShowSpareForm] = useState(false);
   const [editingSpart, setEditingSpart] = useState<SparePart | null>(null);
@@ -128,6 +129,17 @@ export default function ElevatorDetailPage() {
     setLoading(false);
   }, [id]);
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single()
+        .then(({ data: p }) => setRole(p?.role ?? null));
+    });
+  }, []);
   // ── Spare parts CRUD ──
   const handleSaveSpart = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -544,6 +556,15 @@ export default function ElevatorDetailPage() {
                         </div>
                       </div>
                       <div className="flex gap-2 flex-shrink-0">
+                        {(role === "admin" || role === "office") && (
+                          <Link
+                            href={`/expenses?new_part=1&elevator=${id}&desc=${encodeURIComponent(sp.description)}&date=${sp.installation_date}`}
+                            title="Καταχώρησε το κόστος αγοράς στα Έξοδα"
+                            className="text-xs text-gray-400 hover:text-green-600 whitespace-nowrap"
+                          >
+                            → Έξοδο
+                          </Link>
+                        )}
                         <button onClick={() => openEditSpart(sp)} className="text-xs text-gray-400 hover:text-blue-600">Επεξ.</button>
                         <button onClick={() => deleteSpart(sp.id)} className="text-xs text-gray-400 hover:text-red-600">Διαγρ.</button>
                       </div>
