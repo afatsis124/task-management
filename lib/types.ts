@@ -55,6 +55,7 @@ export interface SparePart {
   receipt_date: string | null;
   payment_date: string | null;
   pdf_url?: string;
+  cash_received?: number | null;
   created_at: string;
 }
 
