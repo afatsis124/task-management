@@ -114,6 +114,7 @@ export default function ElevatorDetailPage() {
       gross: "",
       vatRate: "24",
       cash_received: "",
+      payment_date: "",
     };
   }
   function emptyPaymentForm() {
@@ -243,6 +244,7 @@ export default function ElevatorDetailPage() {
       amount: gross > 0 ? net : null,
       vat: gross > 0 ? vatAmount : null,
       cash_received: repairDocForm.cash_received ? parseFloat(repairDocForm.cash_received) : null,
+      payment_date: repairDocForm.payment_date || null,
     };
     if (editingRepairDoc) {
       await supabase.from("repair_documents").update(payload).eq("id", editingRepairDoc.id);
@@ -268,6 +270,7 @@ export default function ElevatorDetailPage() {
           ? String(Math.round((Number(r.vat ?? 0) / Number(r.amount)) * 10000) / 100)
           : "24",
       cash_received: r.cash_received != null ? String(r.cash_received) : "",
+      payment_date: r.payment_date ?? "",
     });
     setShowRepairDocForm(true);
   };
@@ -709,6 +712,10 @@ export default function ElevatorDetailPage() {
                       <input type="number" step="0.01" value={repairDocForm.cash_received} onChange={(e) => setRepairDocForm({ ...repairDocForm, cash_received: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ημ. Εξόφλησης <span className="text-gray-400 font-normal">(κενό = μας χρωστάνε)</span></label>
+                      <input type="date" value={repairDocForm.payment_date} onChange={(e) => setRepairDocForm({ ...repairDocForm, payment_date: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ανέβασμα PDF</label>
                       <input
                         type="file"
@@ -793,6 +800,11 @@ export default function ElevatorDetailPage() {
                                 <span className="text-gray-700 font-semibold">Σύνολο: €{total.toFixed(2)}</span>
                                 <span className="text-gray-400">(καθαρό €{Number(rd.amount).toFixed(2)} + ΦΠΑ €{Number(rd.vat ?? 0).toFixed(2)})</span>
                                 <span className="text-gray-700">Μετρητά: €{cash.toFixed(2)}</span>
+                                {rd.payment_date ? (
+                                  <span className="text-green-600">Εξοφλήθηκε: {new Date(rd.payment_date).toLocaleDateString("el-GR")}</span>
+                                ) : (
+                                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">Μας χρωστάνε</span>
+                                )}
                               </div>
                             );
                           })()}
