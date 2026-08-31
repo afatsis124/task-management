@@ -662,16 +662,19 @@ export default function ExpensesPage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                       />
                     </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Μετρητά που έφυγαν από την εταιρεία (€)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={form.cash_received}
-                        onChange={(e) => setForm({ ...form, cash_received: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
-                    </div>
+                  </div>
+                )}
+
+                {(form.category === "parts" || form.category === "salaries" || form.category === "other") && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Μετρητά που έφυγαν από την εταιρεία (€)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={form.cash_received}
+                      onChange={(e) => setForm({ ...form, cash_received: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
                   </div>
                 )}
 
