@@ -101,6 +101,7 @@ export default function ElevatorDetailPage() {
       receipt_number: "",
       receipt_date: "",
       payment_date: "",
+      cash_received: "",
       pdf_url: "",
     };
   }
@@ -180,6 +181,7 @@ export default function ElevatorDetailPage() {
       receipt_number: spareForm.receipt_number || null,
       receipt_date: spareForm.receipt_date || null,
       payment_date: spareForm.payment_date || null,
+      cash_received: spareForm.cash_received ? parseFloat(spareForm.cash_received) : null,
       pdf_url: spareForm.pdf_url || null,
     };
     if (editingSpart) {
@@ -205,6 +207,7 @@ export default function ElevatorDetailPage() {
       receipt_number: s.receipt_number ?? "",
       receipt_date: s.receipt_date ?? "",
       payment_date: s.payment_date ?? "",
+      cash_received: s.cash_received != null ? String(s.cash_received) : "",
       pdf_url: s.pdf_url ?? "",
     });
     setShowSpareForm(true);
@@ -568,6 +571,10 @@ export default function ElevatorDetailPage() {
                         <input type="date" value={spareForm.payment_date} onChange={(e) => setSpareForm({ ...spareForm, payment_date: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
                       </div>
                       <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Μετρητά που ήρθαν στην εταιρεία (€)</label>
+                        <input type="number" step="0.01" value={spareForm.cash_received} onChange={(e) => setSpareForm({ ...spareForm, cash_received: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                      </div>
+                      <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Τιμολόγιο PDF <span className="text-gray-400 font-normal">(προαιρετικό)</span></label>
                         <input
                           type="file"
@@ -614,6 +621,7 @@ export default function ElevatorDetailPage() {
                           {sp.price_without_vat != null && <span>Χωρίς ΦΠΑ: €{sp.price_without_vat}</span>}
                           {sp.debit_number && <span>Χρεωστικό: {sp.debit_number}</span>}
                           {sp.document_type && <span>{sp.document_type === "sale_confirmation" ? "Βεβαίωση Πώλησης" : "Ταμειακή"}{sp.receipt_number ? ` #${sp.receipt_number}` : ""}</span>}
+                          {sp.cash_received != null && <span className="text-gray-700 font-medium">Μετρητά: €{Number(sp.cash_received).toFixed(2)}</span>}
                           {sp.pdf_url && <a href={sp.pdf_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">Τιμολόγιο PDF</a>}
                         </div>
                         <div className="mt-1">

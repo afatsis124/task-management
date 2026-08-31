@@ -25,6 +25,7 @@ interface Expense {
   payment_date: string | null;
   period_start: string | null;
   period_end: string | null;
+  cash_received: number | null;
   pdf_url: string | null;
   created_at: string;
 }
@@ -73,6 +74,7 @@ function emptyForm() {
     payment_date: "",
     period_start: "",
     period_end: "",
+    cash_received: "",
     pdf_url: "",
   };
 }
@@ -207,6 +209,7 @@ export default function ExpensesPage() {
       payment_date: e.payment_date ?? "",
       period_start: e.period_start ?? "",
       period_end: e.period_end ?? "",
+      cash_received: e.cash_received != null ? String(e.cash_received) : "",
       pdf_url: e.pdf_url ?? "",
     });
     setShowForm(true);
@@ -238,6 +241,7 @@ export default function ExpensesPage() {
       payment_date: form.payment_date || null,
       period_start: form.period_start || null,
       period_end: form.period_end || null,
+      cash_received: form.cash_received ? parseFloat(form.cash_received) : null,
       pdf_url: form.pdf_url || null,
     };
     if (editing) {
@@ -658,6 +662,16 @@ export default function ExpensesPage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                       />
                     </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Μετρητά που ήρθαν στην εταιρεία (€)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={form.cash_received}
+                        onChange={(e) => setForm({ ...form, cash_received: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -791,6 +805,9 @@ export default function ExpensesPage() {
                           <span>
                             Περίοδος: {new Date(e.period_start).toLocaleDateString("el-GR")} – {new Date(e.period_end).toLocaleDateString("el-GR")}
                           </span>
+                        )}
+                        {e.cash_received != null && (
+                          <span className="text-gray-700 font-medium">Μετρητά: €{money(Number(e.cash_received))}</span>
                         )}
                         {e.category === "parts" &&
                           (e.payment_date ? (
