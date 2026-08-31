@@ -67,8 +67,20 @@ export interface RepairDocument {
   description?: string;
   pdf_url?: string;
   status: "pending" | "in_progress" | "completed";
+  amount?: number | null;
+  vat?: number | null;
+  cash_received?: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface RepairVisit {
+  id: string;
+  repair_document_id: string;
+  visit_date: string;
+  completed: string | null;
+  pending: string | null;
+  created_at: string;
 }
 
 /* ───────────────────── Payments ───────────────────── */
