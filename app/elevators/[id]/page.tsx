@@ -94,6 +94,7 @@ export default function ElevatorDetailPage() {
       receipt_number: "",
       receipt_date: "",
       payment_date: "",
+      pdf_url: "",
     };
   }
   function emptyRepairDocForm() {
@@ -142,6 +143,7 @@ export default function ElevatorDetailPage() {
       receipt_number: spareForm.receipt_number || null,
       receipt_date: spareForm.receipt_date || null,
       payment_date: spareForm.payment_date || null,
+      pdf_url: spareForm.pdf_url || null,
     };
     if (editingSpart) {
       await supabase.from("spare_parts").update(payload).eq("id", editingSpart.id);
@@ -166,6 +168,7 @@ export default function ElevatorDetailPage() {
       receipt_number: s.receipt_number ?? "",
       receipt_date: s.receipt_date ?? "",
       payment_date: s.payment_date ?? "",
+      pdf_url: s.pdf_url ?? "",
     });
     setShowSpareForm(true);
   };
@@ -483,10 +486,31 @@ export default function ElevatorDetailPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Ημ. Εξόφλησης <span className="text-gray-400 font-normal">(κενό = εκκρεμεί)</span></label>
                         <input type="date" value={spareForm.payment_date} onChange={(e) => setSpareForm({ ...spareForm, payment_date: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
                       </div>
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Τιμολόγιο PDF <span className="text-gray-400 font-normal">(προαιρετικό)</span></label>
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const url = await handlePdfUpload(file);
+                            if (url) setSpareForm({ ...spareForm, pdf_url: url });
+                          }}
+                          className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                        {uploadingPdf && <p className="text-xs text-blue-600 mt-1">Ανέβασμα...</p>}
+                        {spareForm.pdf_url && !uploadingPdf && (
+                          <div className="flex items-center gap-3 mt-1">
+                            <a href={spareForm.pdf_url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline">Προβολή PDF</a>
+                            <button type="button" onClick={() => setSpareForm({ ...spareForm, pdf_url: "" })} className="text-xs text-gray-400 hover:text-red-600">Αφαίρεση</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="flex justify-end gap-3 pt-2">
                       <button type="button" onClick={() => { setShowSpareForm(false); setEditingSpart(null); }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Ακύρωση</button>
-                      <button type="submit" disabled={savingSpart} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
+                      <button type="submit" disabled={savingSpart || uploadingPdf} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
                         {savingSpart ? "Αποθήκευση..." : "Αποθήκευση"}
                       </button>
                     </div>
@@ -509,6 +533,7 @@ export default function ElevatorDetailPage() {
                           {sp.price_without_vat != null && <span>Χωρίς ΦΠΑ: €{sp.price_without_vat}</span>}
                           {sp.debit_number && <span>Χρεωστικό: {sp.debit_number}</span>}
                           {sp.document_type && <span>{sp.document_type === "sale_confirmation" ? "Βεβαίωση Πώλησης" : "Ταμειακή"}{sp.receipt_number ? ` #${sp.receipt_number}` : ""}</span>}
+                          {sp.pdf_url && <a href={sp.pdf_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">Τιμολόγιο PDF</a>}
                         </div>
                         <div className="mt-1">
                           {sp.payment_date ? (
