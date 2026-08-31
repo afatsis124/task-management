@@ -19,6 +19,10 @@ interface Expense {
   person: string | null;
   elevator_id: string | null;
   document_number: string | null;
+  debit_number: string | null;
+  document_type: "sale_confirmation" | "cash_register" | null;
+  receipt_date: string | null;
+  payment_date: string | null;
   pdf_url: string | null;
   created_at: string;
 }
@@ -61,6 +65,10 @@ function emptyForm() {
     person: "",
     elevator_id: "",
     document_number: "",
+    debit_number: "",
+    document_type: "" as "" | "sale_confirmation" | "cash_register",
+    receipt_date: "",
+    payment_date: "",
     pdf_url: "",
   };
 }
@@ -166,6 +174,10 @@ export default function ExpensesPage() {
       person: e.person ?? "",
       elevator_id: e.elevator_id ?? "",
       document_number: e.document_number ?? "",
+      debit_number: e.debit_number ?? "",
+      document_type: e.document_type ?? "",
+      receipt_date: e.receipt_date ?? "",
+      payment_date: e.payment_date ?? "",
       pdf_url: e.pdf_url ?? "",
     });
     setShowForm(true);
@@ -191,6 +203,10 @@ export default function ExpensesPage() {
       person: form.person || null,
       elevator_id: form.elevator_id || null,
       document_number: form.document_number || null,
+      debit_number: form.debit_number || null,
+      document_type: form.document_type || null,
+      receipt_date: form.receipt_date || null,
+      payment_date: form.payment_date || null,
       pdf_url: form.pdf_url || null,
     };
     if (editing) {
@@ -424,7 +440,7 @@ export default function ExpensesPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {form.category === "parts" ? "Αριθμός τιμολογίου" : "Παραστατικό"}
+                      {form.category === "parts" ? "Αρ. Ταμειακής / Τιμολογίου" : "Παραστατικό"}
                     </label>
                     <input
                       type="text"
@@ -537,9 +553,58 @@ export default function ExpensesPage() {
                 )}
 
                 {form.category === "parts" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Αρ. Χρεωστικού</label>
+                      <input
+                        type="text"
+                        value={form.debit_number}
+                        onChange={(e) => setForm({ ...form, debit_number: e.target.value })}
+                        placeholder="π.χ. 12345"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Παραστατικό</label>
+                      <select
+                        value={form.document_type}
+                        onChange={(e) =>
+                          setForm({ ...form, document_type: e.target.value as "" | "sale_confirmation" | "cash_register" })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                        <option value="">— Επέλεξε —</option>
+                        <option value="sale_confirmation">Βεβαίωση Πώλησης</option>
+                        <option value="cash_register">Αριθμός Ταμειακής</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ημ. Έκδοσης</label>
+                      <input
+                        type="date"
+                        value={form.receipt_date}
+                        onChange={(e) => setForm({ ...form, receipt_date: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Ημ. Εξόφλησης <span className="text-gray-400 font-normal">(κενό = εκκρεμεί)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={form.payment_date}
+                        onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {form.category === "parts" && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Τιμολόγιο (PDF) <span className="text-gray-400 font-normal">προαιρετικό</span>
+                      Τιμολόγιο PDF <span className="text-gray-400 font-normal">(προαιρετικό)</span>
                     </label>
                     <input
                       type="file"
@@ -608,7 +673,7 @@ export default function ExpensesPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={saving}
+                    disabled={saving || uploadingPdf}
                     className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
                   >
                     {saving ? "Αποθήκευση..." : "Αποθήκευση"}
@@ -652,9 +717,26 @@ export default function ExpensesPage() {
                         {e.person && <span>{e.person}</span>}
                         {e.supplier && <span>{e.supplier}</span>}
                         {elevator && <span className="text-blue-600">{elevator.address}</span>}
-                        {e.document_number && (
+                        {e.debit_number && <span>Χρεωστικό: {e.debit_number}</span>}
+                        {e.document_type && (
+                          <span>
+                            {e.document_type === "sale_confirmation" ? "Βεβαίωση Πώλησης" : "Ταμειακή"}
+                            {e.document_number ? ` #${e.document_number}` : ""}
+                          </span>
+                        )}
+                        {e.document_number && !e.document_type && (
                           <span>{e.category === "parts" ? "Τιμ." : "Παρ."} {e.document_number}</span>
                         )}
+                        {e.category === "parts" &&
+                          (e.payment_date ? (
+                            <span className="text-green-600">
+                              Εξοφλήθηκε: {new Date(e.payment_date).toLocaleDateString("el-GR")}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">
+                              Εκκρεμεί εξόφληση
+                            </span>
+                          ))}
                         {e.pdf_url && (
                           <a
                             href={e.pdf_url}
