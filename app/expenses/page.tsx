@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import AppLayout from "@/components/AppLayout";
 import SearchableSelect from "@/components/SearchableSelect";
+import { toStorageKey } from "@/lib/files";
 import type { Elevator, UserProfile } from "@/lib/types";
 
 type Category = "parts" | "fuel" | "salaries" | "taxes" | "bills" | "other";
@@ -18,6 +19,7 @@ interface Expense {
   person: string | null;
   elevator_id: string | null;
   document_number: string | null;
+  pdf_url: string | null;
   created_at: string;
 }
 
@@ -59,6 +61,7 @@ function emptyForm() {
     person: "",
     elevator_id: "",
     document_number: "",
+    pdf_url: "",
   };
 }
 
@@ -79,6 +82,7 @@ export default function ExpensesPage() {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
 
   const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
   const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
@@ -162,6 +166,7 @@ export default function ExpensesPage() {
       person: e.person ?? "",
       elevator_id: e.elevator_id ?? "",
       document_number: e.document_number ?? "",
+      pdf_url: e.pdf_url ?? "",
     });
     setShowForm(true);
   };
@@ -186,6 +191,7 @@ export default function ExpensesPage() {
       person: form.person || null,
       elevator_id: form.elevator_id || null,
       document_number: form.document_number || null,
+      pdf_url: form.pdf_url || null,
     };
     if (editing) {
       await supabase
@@ -200,6 +206,20 @@ export default function ExpensesPage() {
     setForm(emptyForm());
     setSaving(false);
     fetchData();
+  };
+
+  /** Stores the invoice PDF and hangs its address on the form. */
+  const handlePdfUpload = async (file: File) => {
+    setUploadingPdf(true);
+    const path = `expenses/${Date.now()}_${toStorageKey(file.name)}`;
+    const { error } = await supabase.storage.from("repair-pdfs").upload(path, file);
+    setUploadingPdf(false);
+    if (error) {
+      alert("Σφάλμα upload: " + error.message);
+      return;
+    }
+    const { data } = supabase.storage.from("repair-pdfs").getPublicUrl(path);
+    setForm((f) => ({ ...f, pdf_url: data.publicUrl }));
   };
 
   const deleteExpense = async (id: string) => {
@@ -403,7 +423,9 @@ export default function ExpensesPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Παραστατικό</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {form.category === "parts" ? "Αριθμός τιμολογίου" : "Παραστατικό"}
+                    </label>
                     <input
                       type="text"
                       value={form.document_number}
@@ -514,6 +536,43 @@ export default function ExpensesPage() {
                   </div>
                 )}
 
+                {form.category === "parts" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Τιμολόγιο (PDF) <span className="text-gray-400 font-normal">προαιρετικό</span>
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) await handlePdfUpload(file);
+                      }}
+                      className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                    {uploadingPdf && <p className="text-xs text-blue-600 mt-1">Ανέβασμα...</p>}
+                    {form.pdf_url && !uploadingPdf && (
+                      <div className="flex items-center gap-3 mt-1">
+                        <a
+                          href={form.pdf_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-blue-600 underline"
+                        >
+                          Προβολή PDF
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, pdf_url: "" })}
+                          className="text-xs text-gray-500 hover:text-red-600"
+                        >
+                          Αφαίρεση
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {(form.category === "parts" || form.category === "other") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -593,7 +652,19 @@ export default function ExpensesPage() {
                         {e.person && <span>{e.person}</span>}
                         {e.supplier && <span>{e.supplier}</span>}
                         {elevator && <span className="text-blue-600">{elevator.address}</span>}
-                        {e.document_number && <span>Παρ. {e.document_number}</span>}
+                        {e.document_number && (
+                          <span>{e.category === "parts" ? "Τιμ." : "Παρ."} {e.document_number}</span>
+                        )}
+                        {e.pdf_url && (
+                          <a
+                            href={e.pdf_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            PDF
+                          </a>
+                        )}
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
