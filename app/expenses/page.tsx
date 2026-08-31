@@ -663,7 +663,7 @@ export default function ExpensesPage() {
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Μετρητά που ήρθαν στην εταιρεία (€)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Μετρητά που έφυγαν από την εταιρεία (€)</label>
                       <input
                         type="number"
                         step="0.01"
