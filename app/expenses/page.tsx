@@ -23,6 +23,8 @@ interface Expense {
   document_type: "sale_confirmation" | "cash_register" | null;
   receipt_date: string | null;
   payment_date: string | null;
+  period_start: string | null;
+  period_end: string | null;
   pdf_url: string | null;
   created_at: string;
 }
@@ -69,6 +71,8 @@ function emptyForm() {
     document_type: "" as "" | "sale_confirmation" | "cash_register",
     receipt_date: "",
     payment_date: "",
+    period_start: "",
+    period_end: "",
     pdf_url: "",
   };
 }
@@ -201,6 +205,8 @@ export default function ExpensesPage() {
       document_type: e.document_type ?? "",
       receipt_date: e.receipt_date ?? "",
       payment_date: e.payment_date ?? "",
+      period_start: e.period_start ?? "",
+      period_end: e.period_end ?? "",
       pdf_url: e.pdf_url ?? "",
     });
     setShowForm(true);
@@ -230,6 +236,8 @@ export default function ExpensesPage() {
       document_type: form.document_type || null,
       receipt_date: form.receipt_date || null,
       payment_date: form.payment_date || null,
+      period_start: form.period_start || null,
+      period_end: form.period_end || null,
       pdf_url: form.pdf_url || null,
     };
     if (editing) {
@@ -575,6 +583,35 @@ export default function ExpensesPage() {
                   </div>
                 )}
 
+                {form.category === "bills" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Περίοδος τιμολόγησης <span className="text-gray-400 font-normal">(τι διάστημα αφορά ο λογαριασμός)</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Από</label>
+                        <input
+                          type="date"
+                          value={form.period_start}
+                          onChange={(e) => setForm({ ...form, period_start: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Έως</label>
+                        <input
+                          type="date"
+                          min={form.period_start || undefined}
+                          value={form.period_end}
+                          onChange={(e) => setForm({ ...form, period_end: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {form.category === "parts" && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -749,6 +786,11 @@ export default function ExpensesPage() {
                         )}
                         {e.document_number && !e.document_type && (
                           <span>{e.category === "parts" ? "Τιμ." : "Παρ."} {e.document_number}</span>
+                        )}
+                        {e.period_start && e.period_end && (
+                          <span>
+                            Περίοδος: {new Date(e.period_start).toLocaleDateString("el-GR")} – {new Date(e.period_end).toLocaleDateString("el-GR")}
+                          </span>
                         )}
                         {e.category === "parts" &&
                           (e.payment_date ? (
