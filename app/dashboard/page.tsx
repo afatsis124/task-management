@@ -19,8 +19,20 @@ const statusConfig = {
   cancelled: { label: "Ακυρώθηκε", bg: "bg-gray-100", text: "text-gray-500" },
 };
 
+function money(n: number): string {
+  return n.toLocaleString("el-GR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+interface CashStats {
+  inMonth: number;
+  outMonth: number;
+  inYear: number;
+  outYear: number;
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [cash, setCash] = useState<CashStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -66,6 +78,39 @@ export default function DashboardPage() {
       if (recentRes.data) {
         setRecentTasks(recentRes.data as unknown as Task[]);
       }
+
+      // Cash in / out — shown only to admin and office
+      const { data: auth } = await supabase.auth.getUser();
+      if (auth.user) {
+        const { data: prof } = await supabase.from("profiles").select("role").eq("id", auth.user.id).single();
+        const role = (prof as { role?: string } | null)?.role ?? null;
+        if (role === "admin" || role === "office") {
+          const yearStart = `${now.getFullYear()}-01-01`;
+          const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+          const [repCashRes, partCashRes, expCashRes] = await Promise.all([
+            supabase.from("repair_documents").select("cash_received, created_at").not("cash_received", "is", null).gte("created_at", yearStart),
+            supabase.from("spare_parts").select("cash_received, installation_date").not("cash_received", "is", null).gte("installation_date", yearStart),
+            supabase.from("expenses").select("cash_received, date").not("cash_received", "is", null).gte("date", yearStart),
+          ]);
+          let inYear = 0, inMonth = 0, outYear = 0, outMonth = 0;
+          for (const r of (repCashRes.data as { cash_received: number | null; created_at: string }[]) ?? []) {
+            const v = Number(r.cash_received ?? 0);
+            inYear += v;
+            if (r.created_at.startsWith(monthPrefix)) inMonth += v;
+          }
+          for (const p of (partCashRes.data as { cash_received: number | null; installation_date: string }[]) ?? []) {
+            const v = Number(p.cash_received ?? 0);
+            inYear += v;
+            if (p.installation_date.startsWith(monthPrefix)) inMonth += v;
+          }
+          for (const ex of (expCashRes.data as { cash_received: number | null; date: string }[]) ?? []) {
+            const v = Number(ex.cash_received ?? 0);
+            outYear += v;
+            if (ex.date.startsWith(monthPrefix)) outMonth += v;
+          }
+          setCash({ inMonth, outMonth, inYear, outYear });
+        }
+      }
       setLoading(false);
     };
 
@@ -94,6 +139,58 @@ export default function DashboardPage() {
               <StatCard label="Προσεχή Ραντεβού" value={stats?.upcomingAppointments || 0} color="violet" />
               <StatCard label="Λήξη Πιστοποίησης" value={stats?.expiringCertifications || 0} color="rose" />
             </div>
+
+            {/* Cash in / out */}
+            {cash && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6 mb-8">
+                <h2 className="font-semibold text-gray-900 mb-4">Μετρητά εταιρείας</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <p className="text-xs text-gray-500 mb-3 capitalize">
+                      {new Date().toLocaleDateString("el-GR", { month: "long", year: "numeric" })}
+                    </p>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Μπήκαν</span>
+                        <span className="font-semibold text-green-600">+€{money(cash.inMonth)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Έφυγαν</span>
+                        <span className="font-semibold text-red-600">−€{money(cash.outMonth)}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-gray-200 pt-1.5 mt-1.5">
+                        <span className="text-gray-700 font-medium">Ισοζύγιο</span>
+                        <span className={`font-bold ${cash.inMonth - cash.outMonth >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          €{money(cash.inMonth - cash.outMonth)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <p className="text-xs text-gray-500 mb-3">Φέτος ({new Date().getFullYear()})</p>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Μπήκαν</span>
+                        <span className="font-semibold text-green-600">+€{money(cash.inYear)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Έφυγαν</span>
+                        <span className="font-semibold text-red-600">−€{money(cash.outYear)}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-gray-200 pt-1.5 mt-1.5">
+                        <span className="text-gray-700 font-medium">Ισοζύγιο</span>
+                        <span className={`font-bold ${cash.inYear - cash.outYear >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          €{money(cash.inYear - cash.outYear)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-3">
+                  Μπήκαν: μετρητά από επισκευές και ανταλλακτικά. Έφυγαν: μετρητά από τα Έξοδα.
+                </p>
+              </div>
+            )}
 
             {/* Recent Tasks */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
