@@ -7,7 +7,7 @@ import { matchesSearch } from "@/lib/search";
 /*
  * Ανάλυση — where the money actually goes.
  *
- * Income per building   = maintenance payments + repair charges + parts charged
+ * Income per building   = maintenance payments + repair jobs (Επισκευές tab) + parts charged
  * Direct cost per bldg  = expenses linked to that elevator (mostly parts we bought)
  * Building result       = income − direct costs
  * Overheads             = expenses with no building (fuel, salaries, taxes, bills)
@@ -33,8 +33,8 @@ interface PaymentRow {
 }
 interface RepairRow {
   elevator_id: string;
-  cost: number | null;
-  repair_date: string;
+  amount: number | null;
+  created_at: string;
 }
 interface PartRow {
   elevator_id: string;
@@ -100,7 +100,11 @@ export default function AnalysisPage() {
         : Promise.resolve({ data: null }),
       supabase.from("elevators").select("id, address, area, monthly_fee, status"),
       supabase.from("payments").select("elevator_id, month, year, amount").eq("year", year),
-      supabase.from("repair_history").select("elevator_id, cost, repair_date").gte("repair_date", from).lte("repair_date", to),
+      supabase
+        .from("repair_documents")
+        .select("elevator_id, amount, created_at")
+        .gte("created_at", from)
+        .lt("created_at", `${year + 1}-01-01`),
       supabase
         .from("spare_parts")
         .select("elevator_id, price_without_vat, price_with_vat, installation_date")
@@ -151,9 +155,9 @@ export default function AnalysisPage() {
       if (p.month >= 1 && p.month <= 12) monthly[p.month - 1].income += v;
     }
     for (const r of repairs) {
-      const v = Number(r.cost ?? 0);
+      const v = Number(r.amount ?? 0);
       bucket(r.elevator_id).rep += v;
-      monthly[monthOf(r.repair_date) - 1].income += v;
+      monthly[monthOf(r.created_at) - 1].income += v;
     }
     for (const sp of parts) {
       const v = partNet(sp);
@@ -248,7 +252,7 @@ export default function AnalysisPage() {
           </select>
         </div>
         <p className="text-xs text-gray-400 mb-6">
-          Ποσά χωρίς ΦΠΑ. Έσοδα συντήρησης από τις καταχωρημένες πληρωμές του έτους.
+          Ποσά χωρίς ΦΠΑ. Συντηρήσεις από τις καταχωρημένες πληρωμές, επισκευές από την καρτέλα Επισκευών κάθε ασανσέρ.
         </p>
 
         {loading ? (
