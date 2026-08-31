@@ -71,6 +71,7 @@ export interface RepairDocument {
   amount?: number | null;
   vat?: number | null;
   cash_received?: number | null;
+  payment_date?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -14,6 +14,7 @@ interface Payment {
   invoice_number: string | null;
   payment_date: string | null;
   notes: string | null;
+  amount: number | null;
 }
 
 interface CellData {
@@ -64,6 +65,32 @@ export default function PaymentsPage() {
       notes: existing?.notes ?? "",
     });
     setEditingCell({ elevatorId, month });
+  };
+
+  /** Two clicks instead of five: open the month, press the button, done. */
+  const markPaidToday = async (elevatorId: string, month: number) => {
+    setSaving(true);
+    const today = new Date().toISOString().split("T")[0];
+    const existing = getPayment(elevatorId, month);
+    if (existing) {
+      await supabase
+        .from("payments")
+        .update({ payment_date: today, invoice_date: existing.invoice_date ?? today })
+        .eq("id", existing.id);
+    } else {
+      const fee = elevators.find((e) => e.id === elevatorId)?.monthly_fee ?? null;
+      await supabase.from("payments").insert({
+        elevator_id: elevatorId,
+        month,
+        year: selectedYear,
+        invoice_date: today,
+        payment_date: today,
+        amount: fee,
+      });
+    }
+    setEditingCell(null);
+    await fetchData();
+    setSaving(false);
   };
 
   const saveCell = async () => {
@@ -144,6 +171,21 @@ export default function PaymentsPage() {
               <p className="text-sm text-gray-500 mb-4">
                 {MONTHS[editingCell.month - 1]} {selectedYear}
               </p>
+              {!cellForm.payment_date && (
+                <button
+                  type="button"
+                  onClick={() => markPaidToday(editingCell.elevatorId, editingCell.month)}
+                  disabled={saving}
+                  className="w-full mb-4 px-4 py-3 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 transition"
+                >
+                  {saving ? "Αποθήκευση..." : "✓ Πληρώθηκε σήμερα"}
+                </button>
+              )}
+              {cellForm.payment_date && (
+                <p className="mb-4 px-3 py-2 bg-green-50 text-green-700 text-sm rounded-lg">
+                  Πληρώθηκε: {new Date(cellForm.payment_date).toLocaleDateString("el-GR")}
+                </p>
+              )}
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Αρ. Τιμολογίου</label>

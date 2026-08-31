@@ -7,7 +7,9 @@ import { matchesSearch } from "@/lib/search";
 /*
  * Ανάλυση — where the money actually goes.
  *
- * Income per building   = maintenance payments + repair jobs (Επισκευές tab) + parts charged
+ * Invoiced per building = maintenance payments + repair jobs (Επισκευές tab) + parts charged
+ * Collected              = the same rows, but only where a payment date is filled in
+ * Owed                   = invoiced − collected (what the building still has to pay us)
  * Direct cost per bldg  = expenses linked to that elevator (mostly parts we bought)
  * Building result       = income − direct costs
  * Overheads             = expenses with no building (fuel, salaries, taxes, bills)
@@ -30,17 +32,20 @@ interface PaymentRow {
   month: number;
   year: number;
   amount: number | null;
+  payment_date: string | null;
 }
 interface RepairRow {
   elevator_id: string;
   amount: number | null;
   created_at: string;
+  payment_date: string | null;
 }
 interface PartRow {
   elevator_id: string;
   price_without_vat: number | null;
   price_with_vat: number | null;
   installation_date: string;
+  payment_date: string | null;
 }
 interface ExpenseRow {
   elevator_id: string | null;
@@ -99,15 +104,15 @@ export default function AnalysisPage() {
         ? supabase.from("profiles").select("role").eq("id", auth.user.id).single()
         : Promise.resolve({ data: null }),
       supabase.from("elevators").select("id, address, area, monthly_fee, status"),
-      supabase.from("payments").select("elevator_id, month, year, amount").eq("year", year),
+      supabase.from("payments").select("elevator_id, month, year, amount, payment_date").eq("year", year),
       supabase
         .from("repair_documents")
-        .select("elevator_id, amount, created_at")
+        .select("elevator_id, amount, created_at, payment_date")
         .gte("created_at", from)
         .lt("created_at", `${year + 1}-01-01`),
       supabase
         .from("spare_parts")
-        .select("elevator_id, price_without_vat, price_with_vat, installation_date")
+        .select("elevator_id, price_without_vat, price_with_vat, installation_date, payment_date")
         .gte("installation_date", from)
         .lte("installation_date", to),
       supabase.from("expenses").select("elevator_id, category, amount, date").gte("date", from).lte("date", to),
@@ -132,16 +137,19 @@ export default function AnalysisPage() {
     partIncome: number;
     directCosts: number;
     income: number;
+    collected: number;
+    owed: number;
+    owedMonths: number;
     result: number;
   }
 
   const stats = useMemo(() => {
     const feeById = new Map(elevators.map((e) => [e.id, Number(e.monthly_fee ?? 0)]));
-    const by = new Map<string, { fees: number; rep: number; part: number; cost: number }>();
+    const by = new Map<string, { fees: number; rep: number; part: number; cost: number; got: number; owedMonths: number }>();
     const bucket = (id: string) => {
       let b = by.get(id);
       if (!b) {
-        b = { fees: 0, rep: 0, part: 0, cost: 0 };
+        b = { fees: 0, rep: 0, part: 0, cost: 0, got: 0, owedMonths: 0 };
         by.set(id, b);
       }
       return b;
@@ -151,17 +159,24 @@ export default function AnalysisPage() {
 
     for (const p of payments) {
       const v = p.amount != null ? Number(p.amount) : feeById.get(p.elevator_id) ?? 0;
-      bucket(p.elevator_id).fees += v;
+      const b = bucket(p.elevator_id);
+      b.fees += v;
+      if (p.payment_date) b.got += v;
+      else b.owedMonths += 1;
       if (p.month >= 1 && p.month <= 12) monthly[p.month - 1].income += v;
     }
     for (const r of repairs) {
       const v = Number(r.amount ?? 0);
-      bucket(r.elevator_id).rep += v;
+      const b = bucket(r.elevator_id);
+      b.rep += v;
+      if (r.payment_date) b.got += v;
       monthly[monthOf(r.created_at) - 1].income += v;
     }
     for (const sp of parts) {
       const v = partNet(sp);
-      bucket(sp.elevator_id).part += v;
+      const b = bucket(sp.elevator_id);
+      b.part += v;
+      if (sp.payment_date) b.got += v;
       monthly[monthOf(sp.installation_date) - 1].income += v;
     }
 
@@ -181,7 +196,7 @@ export default function AnalysisPage() {
     }
 
     const buildings: BuildingStat[] = elevators.map((e) => {
-      const b = by.get(e.id) ?? { fees: 0, rep: 0, part: 0, cost: 0 };
+      const b = by.get(e.id) ?? { fees: 0, rep: 0, part: 0, cost: 0, got: 0, owedMonths: 0 };
       const income = b.fees + b.rep + b.part;
       return {
         elevator: e,
@@ -190,17 +205,23 @@ export default function AnalysisPage() {
         partIncome: b.part,
         directCosts: b.cost,
         income,
+        collected: b.got,
+        owed: Math.round((income - b.got) * 100) / 100,
+        owedMonths: b.owedMonths,
         result: income - b.cost,
       };
     });
     buildings.sort((a, b) => b.result - a.result);
 
     const totalIncome = buildings.reduce((s, b) => s + b.income, 0);
+    const totalCollected = buildings.reduce((s, b) => s + b.collected, 0);
     return {
       buildings,
       monthly,
       overheads,
       totalIncome,
+      totalCollected,
+      totalOwed: Math.round((totalIncome - totalCollected) * 100) / 100,
       directTotal,
       overheadTotal,
       net: totalIncome - directTotal - overheadTotal,
@@ -252,7 +273,7 @@ export default function AnalysisPage() {
           </select>
         </div>
         <p className="text-xs text-gray-400 mb-6">
-          Ποσά χωρίς ΦΠΑ. Συντηρήσεις από τις καταχωρημένες πληρωμές, επισκευές από την καρτέλα Επισκευών κάθε ασανσέρ.
+          Ποσά χωρίς ΦΠΑ. «Εισπράχθηκαν» μετράει μόνο ό,τι έχει συμπληρωμένη ημερομηνία πληρωμής.
         </p>
 
         {loading ? (
@@ -261,12 +282,28 @@ export default function AnalysisPage() {
           </div>
         ) : (
           <>
-            {/* Company summary */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            {/* What we billed, what actually came in, what is still out there */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
               <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-xs text-gray-500">Έσοδα</p>
+                <p className="text-xs text-gray-500">Τιμολογήθηκαν</p>
                 <p className="text-xl font-bold text-gray-900 mt-1">€{money(stats.totalIncome)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">η δουλειά που έγινε</p>
               </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <p className="text-xs text-gray-500">Εισπράχθηκαν</p>
+                <p className="text-xl font-bold text-green-600 mt-1">€{money(stats.totalCollected)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">τα λεφτά που ήρθαν</p>
+              </div>
+              <div className={`rounded-xl border p-4 ${stats.totalOwed > 0 ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"}`}>
+                <p className="text-xs text-gray-500">Μας χρωστούν</p>
+                <p className={`text-xl font-bold mt-1 ${stats.totalOwed > 0 ? "text-amber-700" : "text-gray-900"}`}>
+                  €{money(stats.totalOwed)}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">τιμολογημένα, απλήρωτα</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <p className="text-xs text-gray-500">Άμεσα κόστη κτιρίων</p>
                 <p className="text-xl font-bold text-gray-900 mt-1">€{money(stats.directTotal)}</p>
@@ -280,8 +317,39 @@ export default function AnalysisPage() {
                 <p className={`text-xl font-bold mt-1 ${stats.net >= 0 ? "text-green-600" : "text-red-600"}`}>
                   €{money(stats.net)}
                 </p>
+                <p className="text-xs text-gray-400 mt-0.5">σε τιμολογημένα</p>
               </div>
             </div>
+
+            {/* Who owes us */}
+            {(() => {
+              const debtors = stats.buildings
+                .filter((b) => b.owed > 0.005)
+                .sort((a, b) => b.owed - a.owed);
+              if (debtors.length === 0) return null;
+              return (
+                <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h2 className="text-sm font-semibold text-gray-900">Τι μας χρωστάνε</h2>
+                    <span className="text-xs text-gray-400">{debtors.length} κτίρια</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {debtors.map((b) => (
+                      <div key={b.elevator.id} className="flex items-center justify-between gap-3 text-sm border-t border-gray-100 pt-1.5 first:border-0 first:pt-0">
+                        <div className="min-w-0">
+                          <p className="text-gray-900 truncate">{b.elevator.address}</p>
+                          <p className="text-xs text-gray-400">
+                            {b.elevator.area}
+                            {b.owedMonths > 0 && ` · ${b.owedMonths} ${b.owedMonths === 1 ? "μήνας" : "μήνες"} συντήρηση`}
+                          </p>
+                        </div>
+                        <span className="font-semibold text-amber-700 whitespace-nowrap">€{money(b.owed)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
               {/* Overheads breakdown */}
@@ -369,6 +437,8 @@ export default function AnalysisPage() {
                         <th className="text-right font-medium pb-2">Συντηρήσεις</th>
                         <th className="text-right font-medium pb-2">Επισκευές</th>
                         <th className="text-right font-medium pb-2">Ανταλλακτικά</th>
+                        <th className="text-right font-medium pb-2">Εισπράχθηκαν</th>
+                        <th className="text-right font-medium pb-2">Χρωστούν</th>
                         <th className="text-right font-medium pb-2">Κόστη</th>
                         <th className="text-right font-medium pb-2">Αποτέλεσμα</th>
                       </tr>
@@ -383,6 +453,10 @@ export default function AnalysisPage() {
                           <td className="py-2 text-right text-gray-700 whitespace-nowrap">€{money(b.fees)}</td>
                           <td className="py-2 text-right text-gray-700 whitespace-nowrap">€{money(b.repairIncome)}</td>
                           <td className="py-2 text-right text-gray-700 whitespace-nowrap">€{money(b.partIncome)}</td>
+                          <td className="py-2 text-right text-green-700 whitespace-nowrap">€{money(b.collected)}</td>
+                          <td className={`py-2 text-right whitespace-nowrap ${b.owed > 0.005 ? "text-amber-700 font-medium" : "text-gray-300"}`}>
+                            €{money(b.owed)}
+                          </td>
                           <td className="py-2 text-right text-gray-700 whitespace-nowrap">€{money(b.directCosts)}</td>
                           <td
                             className={`py-2 text-right font-semibold whitespace-nowrap ${
