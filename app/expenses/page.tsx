@@ -1,0 +1,600 @@
+"use client";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import AppLayout from "@/components/AppLayout";
+import SearchableSelect from "@/components/SearchableSelect";
+import type { Elevator, UserProfile } from "@/lib/types";
+
+type Category = "parts" | "fuel" | "salaries" | "taxes" | "bills" | "other";
+
+interface Expense {
+  id: string;
+  date: string;
+  category: Category;
+  amount: number;
+  vat: number;
+  description: string | null;
+  supplier: string | null;
+  person: string | null;
+  elevator_id: string | null;
+  document_number: string | null;
+  created_at: string;
+}
+
+const CATEGORIES: { key: Category; label: string; color: string }[] = [
+  { key: "parts", label: "Ανταλλακτικά", color: "bg-purple-100 text-purple-700" },
+  { key: "fuel", label: "Καύσιμα / Οχήματα", color: "bg-blue-100 text-blue-700" },
+  { key: "salaries", label: "Μισθοί", color: "bg-green-100 text-green-700" },
+  { key: "taxes", label: "Φόροι / Εισφορές", color: "bg-red-100 text-red-700" },
+  { key: "bills", label: "Λογαριασμοί", color: "bg-amber-100 text-amber-700" },
+  { key: "other", label: "Άλλα", color: "bg-gray-100 text-gray-600" },
+];
+
+const CATEGORY_LABEL: Record<Category, string> = CATEGORIES.reduce(
+  (acc, c) => ({ ...acc, [c.key]: c.label }),
+  {} as Record<Category, string>
+);
+const CATEGORY_COLOR: Record<Category, string> = CATEGORIES.reduce(
+  (acc, c) => ({ ...acc, [c.key]: c.color }),
+  {} as Record<Category, string>
+);
+
+/** Categories that repeat month after month and are worth copying forward. */
+const RECURRING: Category[] = ["fuel", "salaries", "taxes", "bills", "other"];
+
+const VAT_RATES = [24, 13, 6, 0];
+
+function money(n: number): string {
+  return n.toLocaleString("el-GR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function emptyForm() {
+  return {
+    date: new Date().toISOString().split("T")[0],
+    category: "bills" as Category,
+    amount: "",
+    vat: "",
+    description: "",
+    supplier: "",
+    person: "",
+    elevator_id: "",
+    document_number: "",
+  };
+}
+
+export default function ExpensesPage() {
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [elevators, setElevators] = useState<Elevator[]>([]);
+  const [people, setPeople] = useState<UserProfile[]>([]);
+  const [role, setRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Expense | null>(null);
+  const [form, setForm] = useState(emptyForm());
+  const [saving, setSaving] = useState(false);
+  const [copying, setCopying] = useState(false);
+
+  const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+  const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+
+  // First and last day of the selected month, as plain YYYY-MM-DD.
+  const monthRange = (m: number, y: number) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const last = new Date(y, m, 0).getDate();
+    return { from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(last)}` };
+  };
+
+  const fetchData = useCallback(async () => {
+    const { from, to } = monthRange(selectedMonth, selectedYear);
+    const { data: auth } = await supabase.auth.getUser();
+    const [expensesRes, elevatorsRes, peopleRes] = await Promise.all([
+      supabase.from("expenses").select("*").gte("date", from).lte("date", to).order("date", { ascending: false }),
+      supabase.from("elevators").select("*").order("address"),
+      supabase.from("profiles").select("*").order("full_name"),
+    ]);
+    if (expensesRes.data) setExpenses(expensesRes.data as Expense[]);
+    if (elevatorsRes.data) setElevators(elevatorsRes.data as Elevator[]);
+    if (peopleRes.data) setPeople(peopleRes.data as UserProfile[]);
+    // Only used to decide what this page shows — the database enforces the
+    // real restriction through row level security.
+    if (auth.user) {
+      const me = (peopleRes.data as UserProfile[] | null)?.find((p) => p.id === auth.user!.id);
+      setRole(me?.role ?? null);
+    } else {
+      setRole(null);
+    }
+    setLoading(false);
+  }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const elevatorOptions = useMemo(
+    () => elevators.map((e) => ({ value: e.id, label: `${e.address} (${e.area})` })),
+    [elevators]
+  );
+
+  const visible = filterCategory === "all" ? expenses : expenses.filter((e) => e.category === filterCategory);
+
+  const totals = useMemo(() => {
+    const perCategory: Record<string, number> = {};
+    let net = 0;
+    let vat = 0;
+    for (const e of expenses) {
+      const gross = Number(e.amount) + Number(e.vat || 0);
+      perCategory[e.category] = (perCategory[e.category] || 0) + gross;
+      net += Number(e.amount);
+      vat += Number(e.vat || 0);
+    }
+    return { perCategory, net, vat, gross: net + vat };
+  }, [expenses]);
+
+  const openNew = () => {
+    setEditing(null);
+    const f = emptyForm();
+    // Default the date into the month being viewed, not necessarily today.
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const isThisMonth = selectedMonth === now.getMonth() + 1 && selectedYear === now.getFullYear();
+    f.date = isThisMonth ? f.date : `${selectedYear}-${pad(selectedMonth)}-01`;
+    setForm(f);
+    setShowForm(true);
+  };
+
+  const openEdit = (e: Expense) => {
+    setEditing(e);
+    setForm({
+      date: e.date,
+      category: e.category,
+      amount: String(e.amount ?? ""),
+      vat: String(e.vat ?? ""),
+      description: e.description ?? "",
+      supplier: e.supplier ?? "",
+      person: e.person ?? "",
+      elevator_id: e.elevator_id ?? "",
+      document_number: e.document_number ?? "",
+    });
+    setShowForm(true);
+  };
+
+  const handleSave = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setSaving(true);
+    const { data: auth } = await supabase.auth.getUser();
+    const payload = {
+      date: form.date,
+      category: form.category,
+      amount: parseFloat(form.amount) || 0,
+      vat: parseFloat(form.vat) || 0,
+      description: form.description || null,
+      supplier: form.supplier || null,
+      person: form.person || null,
+      elevator_id: form.elevator_id || null,
+      document_number: form.document_number || null,
+    };
+    if (editing) {
+      await supabase
+        .from("expenses")
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq("id", editing.id);
+    } else {
+      await supabase.from("expenses").insert({ ...payload, created_by: auth.user?.id ?? null });
+    }
+    setShowForm(false);
+    setEditing(null);
+    setForm(emptyForm());
+    setSaving(false);
+    fetchData();
+  };
+
+  const deleteExpense = async (id: string) => {
+    if (!confirm("Διαγραφή εξόδου;")) return;
+    await supabase.from("expenses").delete().eq("id", id);
+    fetchData();
+  };
+
+  /** Copies last month's recurring expenses into the month being viewed. */
+  const copyLastMonth = async () => {
+    const { from, to } = monthRange(prevMonth, prevYear);
+    const { data } = await supabase
+      .from("expenses")
+      .select("*")
+      .gte("date", from)
+      .lte("date", to)
+      .in("category", RECURRING);
+    const rows = (data as Expense[]) ?? [];
+    if (rows.length === 0) {
+      alert("Δεν βρέθηκαν επαναλαμβανόμενα έξοδα τον προηγούμενο μήνα.");
+      return;
+    }
+    const monthLabel = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString("el-GR", {
+      month: "long",
+      year: "numeric",
+    });
+    if (!confirm(`Αντιγραφή ${rows.length} εξόδων στον ${monthLabel}; Τα ποσά μπορούν να διορθωθούν μετά.`)) return;
+    setCopying(true);
+    const { data: auth } = await supabase.auth.getUser();
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const copies = rows.map((r) => {
+      const day = Math.min(Number(r.date.split("-")[2]), daysInMonth);
+      return {
+        date: `${selectedYear}-${pad(selectedMonth)}-${pad(day)}`,
+        category: r.category,
+        amount: r.amount,
+        vat: r.vat,
+        description: r.description,
+        supplier: r.supplier,
+        person: r.person,
+        elevator_id: r.elevator_id,
+        document_number: null,
+        created_by: auth.user?.id ?? null,
+      };
+    });
+    await supabase.from("expenses").insert(copies);
+    setCopying(false);
+    fetchData();
+  };
+
+  const applyVat = (rate: number) => {
+    const net = parseFloat(form.amount);
+    if (Number.isNaN(net)) return;
+    setForm({ ...form, vat: ((net * rate) / 100).toFixed(2) });
+  };
+
+  const formNet = parseFloat(form.amount) || 0;
+  const formVat = parseFloat(form.vat) || 0;
+
+  const years = [now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
+  const monthName = new Date(selectedYear, selectedMonth - 1, 1).toLocaleDateString("el-GR", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const allowed = role === "admin" || role === "office";
+
+  if (!loading && !allowed) {
+    return (
+      <AppLayout>
+        <div className="max-w-md mx-auto text-center py-24">
+          <p className="text-gray-900 font-medium">Δεν έχετε πρόσβαση σε αυτή τη σελίδα</p>
+          <p className="text-sm text-gray-500 mt-2">
+            Τα οικονομικά στοιχεία είναι διαθέσιμα μόνο σε διαχειριστές και στο γραφείο.
+          </p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout>
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">Έξοδα</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>
+                  {new Date(2000, m - 1, 1).toLocaleDateString("el-GR", { month: "long" })}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {years.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <button
+              onClick={openNew}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+            >
+              + Νέο Έξοδο
+            </button>
+          </div>
+        </div>
+
+        {/* Month summary */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+          <div className="flex items-end justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-sm text-gray-500 capitalize">{monthName}</p>
+              <p className="text-2xl font-bold text-gray-900 mt-0.5">€{money(totals.gross)}</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Καθαρή αξία €{money(totals.net)} · ΦΠΑ €{money(totals.vat)}
+              </p>
+            </div>
+            <button
+              onClick={copyLastMonth}
+              disabled={copying}
+              className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition"
+            >
+              {copying ? "Αντιγραφή..." : "Αντιγραφή προηγούμενου μήνα"}
+            </button>
+          </div>
+          {expenses.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap gap-x-5 gap-y-2">
+              {CATEGORIES.filter((c) => totals.perCategory[c.key]).map((c) => (
+                <div key={c.key} className="text-xs">
+                  <span className="text-gray-500">{c.label}</span>{" "}
+                  <span className="font-semibold text-gray-900">€{money(totals.perCategory[c.key])}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Category filter */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setFilterCategory("all")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition ${
+              filterCategory === "all" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            Όλα
+          </button>
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setFilterCategory(c.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition ${
+                filterCategory === c.key ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Form */}
+        {showForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">
+                {editing ? "Επεξεργασία Εξόδου" : "Νέο Έξοδο"}
+              </h2>
+              <form onSubmit={handleSave} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Κατηγορία *</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {CATEGORIES.map((c) => (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => setForm({ ...form, category: c.key })}
+                        className={`px-2 py-2 text-xs font-medium rounded-lg border transition ${
+                          form.category === c.key
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ημερομηνία *</label>
+                    <input
+                      type="date"
+                      required
+                      value={form.date}
+                      onChange={(e) => setForm({ ...form, date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Παραστατικό</label>
+                    <input
+                      type="text"
+                      value={form.document_number}
+                      onChange={(e) => setForm({ ...form, document_number: e.target.value })}
+                      placeholder="αν υπάρχει"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Καθαρή αξία (€) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={form.amount}
+                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ΦΠΑ (€)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={form.vat}
+                      onChange={(e) => setForm({ ...form, vat: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                    <div className="flex gap-1.5 mt-1.5">
+                      {VAT_RATES.map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => applyVat(r)}
+                          className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition"
+                        >
+                          {r}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                  <span className="text-gray-500">Σύνολο</span>{" "}
+                  <span className="font-bold text-gray-900">€{money(formNet + formVat)}</span>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Περιγραφή</label>
+                  <input
+                    type="text"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    placeholder="π.χ. ΔΕΗ γραφείου, μπαταρίες UPS"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                {form.category === "salaries" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Άτομο</label>
+                    <input
+                      type="text"
+                      list="expense-people"
+                      value={form.person}
+                      onChange={(e) => setForm({ ...form, person: e.target.value })}
+                      placeholder="όνομα"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                    <datalist id="expense-people">
+                      {people.map((p) => (
+                        <option key={p.id} value={p.full_name || p.email} />
+                      ))}
+                    </datalist>
+                  </div>
+                )}
+
+                {form.category !== "salaries" && form.category !== "taxes" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Προμηθευτής</label>
+                    <input
+                      type="text"
+                      value={form.supplier}
+                      onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                )}
+
+                {(form.category === "parts" || form.category === "other") && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Ασανσέρ <span className="text-gray-400 font-normal">(αν αφορά συγκεκριμένο κτίριο)</span>
+                    </label>
+                    <SearchableSelect
+                      options={elevatorOptions}
+                      value={form.elevator_id}
+                      onChange={(v) => setForm({ ...form, elevator_id: v })}
+                      placeholder="Χωρίς κτίριο"
+                      searchPlaceholder="Αναζήτηση διεύθυνσης ή περιοχής..."
+                      emptyMessage="Δεν βρέθηκαν ασανσέρ"
+                    />
+                    {form.elevator_id && (
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, elevator_id: "" })}
+                        className="text-xs text-gray-500 hover:text-gray-700 mt-1"
+                      >
+                        Καθαρισμός
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowForm(false); setEditing(null); }}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    Ακύρωση
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+                  >
+                    {saving ? "Αποθήκευση..." : "Αποθήκευση"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* List */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="text-center py-20 text-gray-500">
+            Δεν υπάρχουν έξοδα για αυτόν τον μήνα
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {visible.map((e) => {
+              const elevator = elevators.find((el) => el.id === e.elevator_id);
+              const gross = Number(e.amount) + Number(e.vat || 0);
+              return (
+                <div key={e.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${CATEGORY_COLOR[e.category]}`}>
+                          {CATEGORY_LABEL[e.category]}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(e.date).toLocaleDateString("el-GR")}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {e.description || CATEGORY_LABEL[e.category]}
+                      </p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-gray-500">
+                        {e.person && <span>{e.person}</span>}
+                        {e.supplier && <span>{e.supplier}</span>}
+                        {elevator && <span className="text-blue-600">{elevator.address}</span>}
+                        {e.document_number && <span>Παρ. {e.document_number}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-gray-900">€{money(gross)}</p>
+                      {Number(e.vat) > 0 && (
+                        <p className="text-xs text-gray-400">+ΦΠΑ €{money(Number(e.vat))}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1 flex-shrink-0">
+                      <button onClick={() => openEdit(e)} className="text-xs text-gray-400 hover:text-blue-600">
+                        Επεξ.
+                      </button>
+                      <button onClick={() => deleteExpense(e.id)} className="text-xs text-gray-400 hover:text-red-600">
+                        Διαγρ.
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
+}
