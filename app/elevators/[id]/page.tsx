@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AppLayout from "@/components/AppLayout";
 import PhoneLink from "@/components/PhoneLink";
-import type { Elevator, Task, RepairRecord, SparePart, RepairDocument, Payment } from "@/lib/types";
+import type { Elevator, Task, RepairRecord, SparePart, RepairDocument, RepairVisit, Payment } from "@/lib/types";
 import Link from "next/link";
 const priorityConfig = {
   sos: { label: "SOS", bg: "bg-red-100", text: "text-red-700" },
@@ -23,6 +23,7 @@ const repairStatusConfig = {
   completed: { label: "Ολοκληρώθηκε", bg: "bg-green-100", text: "text-green-700" },
 };
 const GREEK_MONTHS = ["", "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος", "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος"];
+const VAT_RATES = [24, 13, 6, 0];
 type Tab = "info" | "tasks" | "repairs" | "spare_parts" | "repair_docs" | "payments";
 /**
  * Supabase Storage rejects filenames containing Greek letters, spaces or most
@@ -64,6 +65,7 @@ export default function ElevatorDetailPage() {
   const [repairs, setRepairs] = useState<RepairRecord[]>([]);
   const [spareParts, setSpareParts] = useState<SparePart[]>([]);
   const [repairDocs, setRepairDocs] = useState<RepairDocument[]>([]);
+  const [repairVisits, setRepairVisits] = useState<RepairVisit[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [tab, setTab] = useState<Tab>("info");
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,10 @@ export default function ElevatorDetailPage() {
   const [repairDocForm, setRepairDocForm] = useState(emptyRepairDocForm());
   const [savingRepairDoc, setSavingRepairDoc] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  // Repair visit form
+  const [visitDocId, setVisitDocId] = useState<string | null>(null);
+  const [visitForm, setVisitForm] = useState({ visit_date: "", completed: "", pending: "" });
+  const [savingVisit, setSavingVisit] = useState(false);
   // Payment form
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
@@ -99,7 +105,15 @@ export default function ElevatorDetailPage() {
     };
   }
   function emptyRepairDocForm() {
-    return { title: "", description: "", status: "pending" as "pending" | "in_progress" | "completed", pdf_url: "" };
+    return {
+      title: "",
+      description: "",
+      status: "pending" as "pending" | "in_progress" | "completed",
+      pdf_url: "",
+      gross: "",
+      vatRate: "24",
+      cash_received: "",
+    };
   }
   function emptyPaymentForm() {
     const now = new Date();
@@ -126,6 +140,17 @@ export default function ElevatorDetailPage() {
     if (spareRes.data) setSpareParts(spareRes.data as SparePart[]);
     if (repairDocRes.data) setRepairDocs(repairDocRes.data as RepairDocument[]);
     if (paymentRes.data) setPayments(paymentRes.data as Payment[]);
+    const docIds = ((repairDocRes.data as RepairDocument[]) ?? []).map((d) => d.id);
+    if (docIds.length > 0) {
+      const { data: visits } = await supabase
+        .from("repair_visits")
+        .select("*")
+        .in("repair_document_id", docIds)
+        .order("visit_date", { ascending: false });
+      setRepairVisits((visits as RepairVisit[]) ?? []);
+    } else {
+      setRepairVisits([]);
+    }
     setLoading(false);
   }, [id]);
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -202,12 +227,19 @@ export default function ElevatorDetailPage() {
   const handleSaveRepairDoc = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingRepairDoc(true);
+    const gross = parseFloat(repairDocForm.gross) || 0;
+    const rate = parseFloat(repairDocForm.vatRate) || 0;
+    const net = Math.round((gross / (1 + rate / 100)) * 100) / 100;
+    const vatAmount = Math.round((gross - net) * 100) / 100;
     const payload = {
       elevator_id: id,
       title: repairDocForm.title,
       description: repairDocForm.description || null,
       pdf_url: repairDocForm.pdf_url || null,
       status: repairDocForm.status,
+      amount: gross > 0 ? net : null,
+      vat: gross > 0 ? vatAmount : null,
+      cash_received: repairDocForm.cash_received ? parseFloat(repairDocForm.cash_received) : null,
     };
     if (editingRepairDoc) {
       await supabase.from("repair_documents").update(payload).eq("id", editingRepairDoc.id);
@@ -222,7 +254,18 @@ export default function ElevatorDetailPage() {
   };
   const openEditRepairDoc = (r: RepairDocument) => {
     setEditingRepairDoc(r);
-    setRepairDocForm({ title: r.title, description: r.description ?? "", status: r.status, pdf_url: r.pdf_url ?? "" });
+    setRepairDocForm({
+      title: r.title,
+      description: r.description ?? "",
+      status: r.status,
+      pdf_url: r.pdf_url ?? "",
+      gross: r.amount != null ? String(Math.round((Number(r.amount) + Number(r.vat ?? 0)) * 100) / 100) : "",
+      vatRate:
+        r.amount != null && Number(r.amount) > 0
+          ? String(Math.round((Number(r.vat ?? 0) / Number(r.amount)) * 10000) / 100)
+          : "24",
+      cash_received: r.cash_received != null ? String(r.cash_received) : "",
+    });
     setShowRepairDocForm(true);
   };
   const deleteRepairDoc = async (docId: string) => {
@@ -230,6 +273,32 @@ export default function ElevatorDetailPage() {
     await supabase.from("repair_documents").delete().eq("id", docId);
     fetchData();
   };
+  // ── Repair visits ──
+  const handleSaveVisit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!visitDocId) return;
+    setSavingVisit(true);
+    await supabase.from("repair_visits").insert({
+      repair_document_id: visitDocId,
+      visit_date: visitForm.visit_date,
+      completed: visitForm.completed || null,
+      pending: visitForm.pending || null,
+    });
+    setSavingVisit(false);
+    setVisitDocId(null);
+    setVisitForm({ visit_date: "", completed: "", pending: "" });
+    fetchData();
+  };
+  const deleteVisit = async (visitId: string) => {
+    if (!confirm("Διαγραφή επίσκεψης;")) return;
+    await supabase.from("repair_visits").delete().eq("id", visitId);
+    fetchData();
+  };
+  // Derived money preview for the repair form (same maths as the Έξοδα page)
+  const docGross = parseFloat(repairDocForm.gross) || 0;
+  const docRate = parseFloat(repairDocForm.vatRate) || 0;
+  const docNet = Math.round((docGross / (1 + docRate / 100)) * 100) / 100;
+  const docVat = Math.round((docGross - docNet) * 100) / 100;
   // ── Payments CRUD ──
   const handleSavePayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -605,6 +674,33 @@ export default function ElevatorDetailPage() {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Συνολική αξία (€) <span className="text-gray-400 font-normal">(τι χρεώνεται το κτίριο)</span></label>
+                      <input type="number" step="0.01" value={repairDocForm.gross} onChange={(e) => setRepairDocForm({ ...repairDocForm, gross: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ΦΠΑ (%)</label>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {VAT_RATES.map((rt) => (
+                          <button key={rt} type="button" onClick={() => setRepairDocForm({ ...repairDocForm, vatRate: String(rt) })} className={`px-3 py-2 text-xs font-medium rounded-lg border transition ${parseFloat(repairDocForm.vatRate) === rt ? "bg-blue-600 border-blue-600 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}>
+                            {rt}%
+                          </button>
+                        ))}
+                        <span className="text-xs text-gray-400 px-1">ή</span>
+                        <input type="number" step="0.1" min="0" value={repairDocForm.vatRate} onChange={(e) => setRepairDocForm({ ...repairDocForm, vatRate: e.target.value })} aria-label="Ποσοστό ΦΠΑ" className="w-20 px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      </div>
+                    </div>
+                    {docGross > 0 && (
+                      <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-sm flex flex-wrap gap-x-5 gap-y-1">
+                        <span><span className="text-gray-500">Καθαρή αξία</span> <span className="font-semibold text-gray-900">€{docNet.toFixed(2)}</span></span>
+                        <span><span className="text-gray-500">ΦΠΑ</span> <span className="font-semibold text-gray-900">€{docVat.toFixed(2)}</span></span>
+                        <span><span className="text-gray-500">Σύνολο</span> <span className="font-bold text-gray-900">€{docGross.toFixed(2)}</span></span>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Μετρητά που ήρθαν στην εταιρεία (€)</label>
+                      <input type="number" step="0.01" value={repairDocForm.cash_received} onChange={(e) => setRepairDocForm({ ...repairDocForm, cash_received: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ανέβασμα PDF</label>
                       <input
                         type="file"
@@ -626,6 +722,33 @@ export default function ElevatorDetailPage() {
                       <button type="button" onClick={() => { setShowRepairDocForm(false); setEditingRepairDoc(null); }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Ακύρωση</button>
                       <button type="submit" disabled={savingRepairDoc || uploadingPdf} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
                         {savingRepairDoc ? "Αποθήκευση..." : "Αποθήκευση"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+            {visitDocId && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                  <h2 className="text-lg font-bold text-gray-900 mb-4">Νέα Επίσκεψη Συνεργείου</h2>
+                  <form onSubmit={handleSaveVisit} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ημερομηνία *</label>
+                      <input required type="date" value={visitForm.visit_date} onChange={(e) => setVisitForm({ ...visitForm, visit_date: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Τι ολοκληρώθηκε</label>
+                      <textarea rows={2} value={visitForm.completed} onChange={(e) => setVisitForm({ ...visitForm, completed: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Τι έμεινε να εκκρεμεί</label>
+                      <textarea rows={2} value={visitForm.pending} onChange={(e) => setVisitForm({ ...visitForm, pending: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button type="button" onClick={() => setVisitDocId(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Ακύρωση</button>
+                      <button type="submit" disabled={savingVisit} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
+                        {savingVisit ? "Αποθήκευση..." : "Αποθήκευση"}
                       </button>
                     </div>
                   </form>
@@ -654,11 +777,51 @@ export default function ElevatorDetailPage() {
                             </a>
                           )}
                           <p className="text-xs text-gray-400 mt-1">{new Date(rd.created_at).toLocaleDateString("el-GR")}</p>
+                          {rd.amount != null && (() => {
+                            const total = Math.round((Number(rd.amount) + Number(rd.vat ?? 0)) * 100) / 100;
+                            const cash = Number(rd.cash_received ?? 0);
+                            const left = Math.round((total - cash) * 100) / 100;
+                            return (
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs">
+                                <span className="text-gray-700 font-semibold">Σύνολο: €{total.toFixed(2)}</span>
+                                <span className="text-gray-400">(καθαρό €{Number(rd.amount).toFixed(2)} + ΦΠΑ €{Number(rd.vat ?? 0).toFixed(2)})</span>
+                                <span className="text-gray-700">Μετρητά: €{cash.toFixed(2)}</span>
+                                {left > 0 ? (
+                                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">Υπόλοιπο €{left.toFixed(2)}</span>
+                                ) : (
+                                  <span className="text-green-600 font-medium">Εξοφλημένο</span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="flex gap-2 flex-shrink-0">
                           <button onClick={() => openEditRepairDoc(rd)} className="text-xs text-gray-400 hover:text-blue-600">Επεξ.</button>
                           <button onClick={() => deleteRepairDoc(rd.id)} className="text-xs text-gray-400 hover:text-red-600">Διαγρ.</button>
                         </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-xs font-medium text-gray-500">Επισκέψεις συνεργείου</p>
+                          <button onClick={() => { setVisitDocId(rd.id); setVisitForm({ visit_date: new Date().toISOString().split("T")[0], completed: "", pending: "" }); }} className="text-xs text-blue-600 hover:underline">+ Επίσκεψη</button>
+                        </div>
+                        {repairVisits.filter((v) => v.repair_document_id === rd.id).length === 0 ? (
+                          <p className="text-xs text-gray-400">Καμία επίσκεψη ακόμα</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {repairVisits.filter((v) => v.repair_document_id === rd.id).map((v) => (
+                              <div key={v.id} className="flex items-start gap-2 text-xs">
+                                <span className="text-gray-500 whitespace-nowrap font-medium">{new Date(v.visit_date).toLocaleDateString("el-GR")}</span>
+                                <div className="flex-1 min-w-0">
+                                  {v.completed && <p className="text-green-700">✓ {v.completed}</p>}
+                                  {v.pending && <p className="text-amber-700">⏳ Εκκρεμεί: {v.pending}</p>}
+                                  {!v.completed && !v.pending && <p className="text-gray-400">Χωρίς σημειώσεις</p>}
+                                </div>
+                                <button onClick={() => deleteVisit(v.id)} className="text-gray-300 hover:text-red-600 flex-shrink-0">Διαγρ.</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
