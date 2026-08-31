@@ -780,17 +780,11 @@ export default function ElevatorDetailPage() {
                           {rd.amount != null && (() => {
                             const total = Math.round((Number(rd.amount) + Number(rd.vat ?? 0)) * 100) / 100;
                             const cash = Number(rd.cash_received ?? 0);
-                            const left = Math.round((total - cash) * 100) / 100;
                             return (
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs">
                                 <span className="text-gray-700 font-semibold">Σύνολο: €{total.toFixed(2)}</span>
                                 <span className="text-gray-400">(καθαρό €{Number(rd.amount).toFixed(2)} + ΦΠΑ €{Number(rd.vat ?? 0).toFixed(2)})</span>
                                 <span className="text-gray-700">Μετρητά: €{cash.toFixed(2)}</span>
-                                {left > 0 ? (
-                                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">Υπόλοιπο €{left.toFixed(2)}</span>
-                                ) : (
-                                  <span className="text-green-600 font-medium">Εξοφλημένο</span>
-                                )}
                               </div>
                             );
                           })()}
