@@ -128,6 +128,29 @@ export default function ExpensesPage() {
     fetchData();
   }, [fetchData]);
 
+  // Opened via "→ Έξοδο" on an elevator's spare part: the form arrives
+  // pre-filled so only the purchase cost and invoice need typing.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("new_part") !== "1") return;
+    const date = q.get("date") || new Date().toISOString().split("T")[0];
+    const d = new Date(date);
+    if (!isNaN(d.getTime())) {
+      setSelectedMonth(d.getMonth() + 1);
+      setSelectedYear(d.getFullYear());
+    }
+    setEditing(null);
+    setForm({
+      ...emptyForm(),
+      category: "parts",
+      date,
+      description: q.get("desc") || "",
+      elevator_id: q.get("elevator") || "",
+    });
+    setShowForm(true);
+    window.history.replaceState({}, "", "/expenses");
+  }, []);
+
   const elevatorOptions = useMemo(
     () => elevators.map((e) => ({ value: e.id, label: `${e.address} (${e.area})` })),
     [elevators]
